@@ -212,7 +212,9 @@ function animate(timestamp) {
   }
 
   renderCaja();
-  updateGauge(Math.abs(vel) * SLOPE_M * 3600);
+  // Velocímetro solo muestra velocidad si el motor está conectado (no en N ni calado)
+  const displaySpeed = (gear !== 'N' && !engineStalled) ? Math.abs(vel) * SLOPE_M * 3600 : 0;
+  updateGauge(displaySpeed);
   const rpm = (engineRunning && !engineStalled)
     ? RPM_IDLE + (acceleratorValue / 100) * (RPM_MAX - RPM_IDLE)
     : 0;
