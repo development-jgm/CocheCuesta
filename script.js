@@ -21,11 +21,13 @@ let STALL_THRESHOLD   = 0.75;
 let BRAKE_DEADBAND    = 97;
 let CLUTCH_ENABLE_THR = 97;
 let INITIAL_POSX      = 0.9;
-let AUDIO_FREQ_IDLE   = 65;
-let AUDIO_FREQ_MAX    = 210;
-let AUDIO_VOL_IDLE    = 0.07;
-let AUDIO_VOL_MAX     = 0.45;
+let AUDIO_FREQ_IDLE   = 47;
+let AUDIO_FREQ_MAX    = 200;
+let AUDIO_VOL_IDLE    = 0.35;
+let AUDIO_VOL_MAX     = 0.60;
 let AUDIO_INERTIA     = 0.18;
+let AUDIO_FILT_MIN    = 130;
+let AUDIO_FILT_MAX    = 520;
 
 async function loadConfig() {
   try {
@@ -47,6 +49,8 @@ async function loadConfig() {
     AUDIO_VOL_IDLE    = cfg.audio?.volumen_ralenti                   ?? AUDIO_VOL_IDLE;
     AUDIO_VOL_MAX     = cfg.audio?.volumen_max                       ?? AUDIO_VOL_MAX;
     AUDIO_INERTIA     = cfg.audio?.inercia_motor_s                   ?? AUDIO_INERTIA;
+    AUDIO_FILT_MIN    = cfg.audio?.filtro_cutoff_min_hz              ?? AUDIO_FILT_MIN;
+    AUDIO_FILT_MAX    = cfg.audio?.filtro_cutoff_max_hz              ?? AUDIO_FILT_MAX;
   } catch {
     console.warn('config.json no encontrado — usando valores por defecto');
   }
@@ -469,48 +473,113 @@ function updateStallLight(stalled) {
 
 // ── Audio: sonido del motor ───────────────────────────────────────────────────
 
-let audioCtx   = null;
-let engineOsc  = null;
-let engineFilt = null;
-let engineGain = null;
+let audioCtx    = null;
+let engineOsc1  = null; // oscilador principal (sawtooth)
+let engineOsc2  = null; // desafinado → batimiento rugoso
+let engineOsc3  = null; // sub-octava cuadrada → cuerpo grave
+let engineFilt  = null;
+let engineGain  = null;
+let idleLfo     = null; // modula amplitud → irregularidad de pistones
+let idleLfoGain = null;
+
+function makeSoftClipCurve(amount) {
+  const n = 512;
+  const curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i * 2) / n - 1;
+    curve[i] = (Math.PI + amount) * x / (Math.PI + amount * Math.abs(x));
+  }
+  return curve;
+}
 
 function initAudio() {
   if (audioCtx) return;
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const f = AUDIO_FREQ_IDLE;
 
-  engineOsc = audioCtx.createOscillator();
-  engineOsc.type = 'sawtooth';
-  engineOsc.frequency.setValueAtTime(AUDIO_FREQ_IDLE, audioCtx.currentTime);
+  engineOsc1 = audioCtx.createOscillator();
+  engineOsc1.type = 'sawtooth';
+  engineOsc1.frequency.value = f;
 
+  engineOsc2 = audioCtx.createOscillator(); // ligeramente plano → batimiento
+  engineOsc2.type = 'sawtooth';
+  engineOsc2.frequency.value = f * 0.985;
+
+  engineOsc3 = audioCtx.createOscillator(); // sub-octava → graves
+  engineOsc3.type = 'square';
+  engineOsc3.frequency.value = f * 0.5;
+
+  const g1 = audioCtx.createGain(); g1.gain.value = 0.50;
+  const g2 = audioCtx.createGain(); g2.gain.value = 0.30;
+  const g3 = audioCtx.createGain(); g3.gain.value = 0.38;
+
+  // WaveShaper: distorsión suave → armónicos graves (ronco)
+  const shaper = audioCtx.createWaveShaper();
+  shaper.curve = makeSoftClipCurve(80);
+  shaper.oversample = '4x';
+
+  // Paso-bajo muy agresivo: elimina agudos → carácter grave de coche
   engineFilt = audioCtx.createBiquadFilter();
   engineFilt.type = 'lowpass';
-  engineFilt.frequency.setValueAtTime(400, audioCtx.currentTime);
-  engineFilt.Q.setValueAtTime(2, audioCtx.currentTime);
+  engineFilt.frequency.value = AUDIO_FILT_MIN;
+  engineFilt.Q.value = 4;
+
+  // LFO: modula amplitud al ritmo de pistones → irregularidad de ralentí
+  idleLfo = audioCtx.createOscillator();
+  idleLfo.type = 'sine';
+  idleLfo.frequency.value = 4;
+
+  idleLfoGain = audioCtx.createGain();
+  idleLfoGain.gain.value = 0.12;
+
+  // Nodo que recibe la modulación del LFO (ganancia base = 1)
+  const lfoAmp = audioCtx.createGain();
+  lfoAmp.gain.value = 1;
+  idleLfo.connect(idleLfoGain);
+  idleLfoGain.connect(lfoAmp.gain);
 
   engineGain = audioCtx.createGain();
-  engineGain.gain.setValueAtTime(AUDIO_VOL_IDLE, audioCtx.currentTime);
+  engineGain.gain.value = 0;
 
-  engineOsc.connect(engineFilt);
-  engineFilt.connect(engineGain);
+  // Cadena: osciladores → shaper → filtro → lfoAmp → ganancia → salida
+  engineOsc1.connect(g1); g1.connect(shaper);
+  engineOsc2.connect(g2); g2.connect(shaper);
+  engineOsc3.connect(g3); g3.connect(shaper);
+  shaper.connect(engineFilt);
+  engineFilt.connect(lfoAmp);
+  lfoAmp.connect(engineGain);
   engineGain.connect(audioCtx.destination);
-  engineOsc.start();
+
+  engineOsc1.start();
+  engineOsc2.start();
+  engineOsc3.start();
+  idleLfo.start();
 }
 
 function updateEngineSound(accelPct, running) {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;
+
   if (!running) {
-    engineGain.gain.setTargetAtTime(0, t, 0.1);
+    engineGain.gain.setTargetAtTime(0, t, 0.15);
     return;
   }
-  const freq = AUDIO_FREQ_IDLE + (accelPct / 100) * (AUDIO_FREQ_MAX - AUDIO_FREQ_IDLE);
-  const vol  = AUDIO_VOL_IDLE  + (accelPct / 100) * (AUDIO_VOL_MAX  - AUDIO_VOL_IDLE);
-  // Filtro más abierto a altas revoluciones
-  const fcut = 300 + (accelPct / 100) * 1200;
 
-  engineOsc.frequency.setTargetAtTime(freq, t, AUDIO_INERTIA);
-  engineGain.gain.setTargetAtTime(vol,  t, AUDIO_INERTIA);
+  const freq = AUDIO_FREQ_IDLE + (accelPct / 100) * (AUDIO_FREQ_MAX - AUDIO_FREQ_IDLE);
+  engineOsc1.frequency.setTargetAtTime(freq,         t, AUDIO_INERTIA);
+  engineOsc2.frequency.setTargetAtTime(freq * 0.985, t, AUDIO_INERTIA);
+  engineOsc3.frequency.setTargetAtTime(freq * 0.5,   t, AUDIO_INERTIA);
+
+  // Filtro se abre con las RPM (más brillante acelerando, más cerrado en ralentí)
+  const fcut = AUDIO_FILT_MIN + (accelPct / 100) * (AUDIO_FILT_MAX - AUDIO_FILT_MIN);
   engineFilt.frequency.setTargetAtTime(fcut, t, AUDIO_INERTIA);
+
+  // LFO más rápido al acelerar, menor profundidad (menos variación a altas rpm)
+  idleLfo.frequency.setTargetAtTime(4 + (accelPct / 100) * 10, t, AUDIO_INERTIA * 2);
+  idleLfoGain.gain.setTargetAtTime(0.12 * (1 - accelPct / 180), t, AUDIO_INERTIA);
+
+  const vol = AUDIO_VOL_IDLE + (accelPct / 100) * (AUDIO_VOL_MAX - AUDIO_VOL_IDLE);
+  engineGain.gain.setTargetAtTime(vol, t, AUDIO_INERTIA);
 }
 
 loadConfig().then(() => {

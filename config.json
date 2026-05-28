@@ -22,10 +22,12 @@
     "tiempo_calado_ms": 1500
   },
   "audio": {
-    "frecuencia_ralenti_hz": 65,
-    "frecuencia_max_hz": 210,
-    "volumen_ralenti": 0.30,
-    "volumen_max": 0.45,
-    "inercia_motor_s": 0.18
+    "frecuencia_ralenti_hz": 47,
+    "frecuencia_max_hz": 200,
+    "volumen_ralenti": 0.35,
+    "volumen_max": 0.60,
+    "inercia_motor_s": 0.18,
+    "filtro_cutoff_min_hz": 130,
+    "filtro_cutoff_max_hz": 520
   }
 }
