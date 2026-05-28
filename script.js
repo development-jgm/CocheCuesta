@@ -10,17 +10,31 @@ const wrEl       = document.getElementById('wr');
 const SLOPE_M    = 30;    // longitud virtual de la cuesta en metros
 const CAJA_W     = 320;
 const CAJA_H     = 160;
-const MAX_VEL    = 0.0008;
-const ACCEL_RATE = 0.003;
-const BRAKE_RATE = 0.05;
+const MAX_VEL        = 0.0008; // velocidad máx cuesta abajo (sin freno, sin motor)
+const ENGINE_MAX_VEL = 0.0014; // velocidad máx cuesta arriba (embrague totalmente soltado)
+const ACCEL_RATE     = 0.003;
+const BRAKE_RATE     = 0.05;
 
 let posX         = 0.9;
 let wheelAngle   = 0; // grados acumulados de rotación de las ruedas
 let vel          = 0;
 let lastTime     = null;
-let brakeValue   = 0;
-let handbrake    = true;
+let brakeValue       = 0;
+let clutchValue      = 0;   // 0 = sin pisar, 100 = a fondo
+let gear             = 'N';
+let handbrake        = true;
 let arduinoConnected = false;
+
+const gearInputs = document.querySelectorAll('input[name="marcha"]');
+
+function updateGearSelector() {
+  const enabled = clutchValue >= 97;
+  gearInputs.forEach(inp => inp.disabled = !enabled);
+}
+
+gearInputs.forEach(inp =>
+  inp.addEventListener('change', () => { if (!inp.disabled) gear = inp.value; })
+);
 
 // ── Pendiente ─────────────────────────────────────────────────────────────────
 
@@ -65,27 +79,39 @@ function animate(timestamp) {
 
   const theta          = getTheta();
   const effectiveBrake = handbrake ? 100 : brakeValue;
-  const targetVel      = MAX_VEL * Math.sin(theta) * Math.sqrt(1 - effectiveBrake / 100);
-  const rate           = vel > targetVel ? BRAKE_RATE : ACCEL_RATE;
 
-  vel  += (targetVel - vel) * Math.min(1, rate * dt);
-  vel   = Math.max(0, vel);
-  posX -= vel * dt;
+  // Gravedad: siempre cuesta abajo (vel negativa)
+  const gravVelTarget = -MAX_VEL * Math.sin(theta);
 
-  if (posX <= 0) {
-    posX = 0.9;
-    vel  = 0;
-    lastTime = null;
+  // Motor: cuesta arriba proporcional al embrague soltado
+  let engineVelTarget = 0;
+  if (gear !== 'N') {
+    const engagement = Math.max(0, 1 - clutchValue / 100);
+    engineVelTarget  = ENGINE_MAX_VEL * engagement;
   }
+
+  // Target combinado, luego frenado
+  const physTarget = gravVelTarget + engineVelTarget;
+  const targetVel  = effectiveBrake >= 97 ? 0 : physTarget * (1 - effectiveBrake / 100);
+
+  const decelerating = Math.abs(targetVel) < Math.abs(vel) ||
+                       (vel !== 0 && Math.sign(targetVel) !== Math.sign(vel));
+  const rate = decelerating ? BRAKE_RATE : ACCEL_RATE;
+  vel += (targetVel - vel) * Math.min(1, rate * dt);
+
+  posX += vel * dt;
+  if (posX <= 0) { posX = 0; if (vel < 0) vel = 0; }
+  if (posX >= 1) { posX = 1; if (vel > 0) vel = 0; }
 
   // Radio rueda: 9 SVG units × escala (320px / 80 SVG) = 36 px
   const wheelRpx = 9 * (CAJA_W / 80);
-  wheelAngle -= (vel * rectEl.clientWidth / wheelRpx) * (180 / Math.PI) * dt;
+  // vel<0 = baja (antihorario), vel>0 = sube (horario)
+  wheelAngle += (vel * rectEl.clientWidth / wheelRpx) * (180 / Math.PI) * dt;
   wfEl.setAttribute('transform', `rotate(${wheelAngle}, 16, 31)`);
   wrEl.setAttribute('transform', `rotate(${wheelAngle}, 62, 31)`);
 
   renderCaja();
-  updateGauge(vel * SLOPE_M * 3600);
+  updateGauge(Math.abs(vel) * SLOPE_M * 3600);
 }
 
 function reset() {
@@ -283,11 +309,18 @@ async function connectArduino() {
       const lines = buffer.split('\n');
       buffer = lines.pop();
       for (const line of lines) {
-        const val = parseInt(line.trim(), 10);
-        if (!isNaN(val)) {
-          let v = Math.max(0, Math.min(100, val));
-          if (v >= 97) v = 100; // zona muerta solo en el extremo de freno máximo
+        const parts = line.trim().split(',');
+        if (parts.length < 2) continue;
+        const rawBrake  = parseInt(parts[0], 10);
+        const rawClutch = parseInt(parts[1], 10);
+        if (!isNaN(rawBrake)) {
+          let v = Math.max(0, Math.min(100, rawBrake));
+          if (v >= 97) v = 100;
           brakeValue = v;
+        }
+        if (!isNaN(rawClutch)) {
+          clutchValue = Math.max(0, Math.min(100, rawClutch));
+          updateGearSelector();
         }
       }
     }
