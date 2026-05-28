@@ -193,7 +193,7 @@ function animate(timestamp) {
   // Partículas de humo proporcionales a RPM (coordenadas SVG diretas)
   updateParticles(dt);
   if (engineRunning && !engineStalled) {
-    const spawnRate = 0.015 + (rpm / RPM_MAX) * 0.08; // muy leve en ralentí, aumenta con acelerador
+    const spawnRate = 0.04 + (rpm / RPM_MAX) * 0.12; // leve en ralentí, aumenta con acelerador
     const toSpawn = Math.floor(spawnRate * dt);
     if (toSpawn > 0) {
       spawnSmoke(3, -17, toSpawn, rpm); // salida del tubo de escape en coordenadas SVG
