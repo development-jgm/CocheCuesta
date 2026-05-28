@@ -9,7 +9,7 @@
     "tasa_frenado": 0.05
   },
   "motor": {
-    "velocidad_max_ralenti": 0.0003,
+    "velocidad_max_ralenti": 0.00008,
     "rpm_ralenti": 700,
     "rpm_max": 6500
   },
