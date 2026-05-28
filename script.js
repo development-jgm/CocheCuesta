@@ -7,16 +7,40 @@ const frenoMano  = document.getElementById('frenoMano');
 const wfEl       = document.getElementById('wf');
 const wrEl       = document.getElementById('wr');
 
-const SLOPE_M    = 30;    // longitud virtual de la cuesta en metros
-const CAJA_W     = 320;
-const CAJA_H     = 160;
-const MAX_VEL        = 0.0008; // velocidad máx cuesta abajo (sin freno, sin motor)
-const ENGINE_MAX_VEL = 0.0003; // a ralentí apenas arrastra; necesita gas para subir pendientes
-const STALL_TIME     = 1500;  // ms de sobrecarga antes de calarse
-const ACCEL_RATE     = 0.003;
-const BRAKE_RATE     = 0.05;
+const CAJA_W = 320;
+const CAJA_H = 160;
 
-let posX         = 0.9;
+// Parámetros del modelo — sobreescritos por config.json al arrancar
+let SLOPE_M           = 30;
+let MAX_VEL           = 0.0008;
+let ENGINE_MAX_VEL    = 0.0003;
+let ACCEL_RATE        = 0.003;
+let BRAKE_RATE        = 0.05;
+let STALL_TIME        = 1500;
+let STALL_THRESHOLD   = 0.75;
+let BRAKE_DEADBAND    = 97;
+let CLUTCH_ENABLE_THR = 97;
+let INITIAL_POSX      = 0.9;
+
+async function loadConfig() {
+  try {
+    const cfg = await fetch('config.json').then(r => r.json());
+    SLOPE_M           = cfg.simulacion?.longitud_cuesta_m           ?? SLOPE_M;
+    INITIAL_POSX      = cfg.simulacion?.posicion_inicial             ?? INITIAL_POSX;
+    MAX_VEL           = cfg.fisica?.velocidad_max_bajada             ?? MAX_VEL;
+    ACCEL_RATE        = cfg.fisica?.tasa_aceleracion                 ?? ACCEL_RATE;
+    BRAKE_RATE        = cfg.fisica?.tasa_frenado                     ?? BRAKE_RATE;
+    ENGINE_MAX_VEL    = cfg.motor?.velocidad_max_ralenti              ?? ENGINE_MAX_VEL;
+    BRAKE_DEADBAND    = cfg.freno?.zona_muerta_pct                   ?? BRAKE_DEADBAND;
+    CLUTCH_ENABLE_THR = cfg.embrague?.umbral_activacion_marchas_pct  ?? CLUTCH_ENABLE_THR;
+    STALL_THRESHOLD   = cfg.embrague?.umbral_calado                  ?? STALL_THRESHOLD;
+    STALL_TIME        = cfg.embrague?.tiempo_calado_ms               ?? STALL_TIME;
+  } catch {
+    console.warn('config.json no encontrado — usando valores por defecto');
+  }
+}
+
+let posX         = INITIAL_POSX;
 let wheelAngle   = 0; // grados acumulados de rotación de las ruedas
 let vel          = 0;
 let lastTime     = null;
@@ -31,7 +55,7 @@ let arduinoConnected = false;
 const gearInputs = document.querySelectorAll('input[name="marcha"]');
 
 function updateGearSelector() {
-  const enabled = clutchValue >= 97;
+  const enabled = clutchValue >= CLUTCH_ENABLE_THR;
   gearInputs.forEach(inp => inp.disabled = !enabled);
 }
 
@@ -96,7 +120,7 @@ function animate(timestamp) {
   // ── Lógica de calado ──────────────────────────────────────────────────────
   // A ralentí, soltar el embrague más del 65% de recorrido cala el motor
   if (!engineStalled && gear !== 'N') {
-    if (engagement > 0.75) {
+    if (engagement > STALL_THRESHOLD) {
       stallTimer += dt;
       if (stallTimer >= STALL_TIME) engineStalled = true;
     } else {
@@ -104,12 +128,12 @@ function animate(timestamp) {
     }
   }
   // Arrancar: embrague a fondo reinicia el motor
-  if (engineStalled && clutchValue >= 97) {
+  if (engineStalled && clutchValue >= CLUTCH_ENABLE_THR) {
     engineStalled = false;
     stallTimer    = 0;
   }
   updateStallLight(engineStalled);
-  const targetVel  = effectiveBrake >= 97 ? 0 : physTarget * (1 - effectiveBrake / 100);
+  const targetVel  = effectiveBrake >= BRAKE_DEADBAND ? 0 : physTarget * (1 - effectiveBrake / 100);
 
   const decelerating = Math.abs(targetVel) < Math.abs(vel) ||
                        (vel !== 0 && Math.sign(targetVel) !== Math.sign(vel));
@@ -132,7 +156,7 @@ function animate(timestamp) {
 }
 
 function reset() {
-  posX     = 0.9;
+  posX     = INITIAL_POSX;
   vel      = 0;
   lastTime = null;
 }
@@ -323,8 +347,11 @@ function updateStallLight(stalled) {
   }
 }
 
-initGauge();
-requestAnimationFrame(animate);
+loadConfig().then(() => {
+  posX = INITIAL_POSX; // aplicar posición inicial del config
+  initGauge();
+  requestAnimationFrame(animate);
+});
 
 // ── Freno de mano + Web Serial ────────────────────────────────────────────────
 
@@ -360,7 +387,7 @@ async function connectArduino() {
         const rawClutch = parseInt(parts[1], 10);
         if (!isNaN(rawBrake)) {
           let v = Math.max(0, Math.min(100, rawBrake));
-          if (v >= 97) v = 100;
+          if (v >= BRAKE_DEADBAND) v = 100;
           brakeValue = v;
         }
         if (!isNaN(rawClutch)) {

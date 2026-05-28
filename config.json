@@ -1,0 +1,22 @@
+{
+  "simulacion": {
+    "longitud_cuesta_m": 30,
+    "posicion_inicial": 0.9
+  },
+  "fisica": {
+    "velocidad_max_bajada": 0.0008,
+    "tasa_aceleracion": 0.003,
+    "tasa_frenado": 0.05
+  },
+  "motor": {
+    "velocidad_max_ralenti": 0.0003
+  },
+  "freno": {
+    "zona_muerta_pct": 97
+  },
+  "embrague": {
+    "umbral_activacion_marchas_pct": 97,
+    "umbral_calado": 0.75,
+    "tiempo_calado_ms": 1500
+  }
+}
