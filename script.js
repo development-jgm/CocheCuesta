@@ -4,8 +4,9 @@ const valor      = document.getElementById('valor');
 const caja       = document.getElementById('caja');
 const rectEl     = document.querySelector('.cuadrado');
 const frenoMano  = document.getElementById('frenoMano');
-const wfEl       = document.getElementById('wf');
-const wrEl       = document.getElementById('wr');
+const wfEl         = document.getElementById('wf');
+const wrEl         = document.getElementById('wr');
+const carroceriaEl = document.getElementById('carroceria');
 
 const CAJA_W = 320;
 const CAJA_H = 160;
@@ -168,6 +169,17 @@ function animate(timestamp) {
   wheelAngle += (vel * rectEl.clientWidth / wheelRpx) * (180 / Math.PI) * dt;
   wfEl.setAttribute('transform', `rotate(${wheelAngle}, 16, 31)`);
   wrEl.setAttribute('transform', `rotate(${wheelAngle}, 62, 31)`);
+
+  // Temblor de carrocería proporcional a las RPM (ruedas no se mueven)
+  if (engineRunning && !engineStalled) {
+    const rpmNorm = RPM_IDLE / RPM_MAX + (acceleratorValue / 100) * (1 - RPM_IDLE / RPM_MAX);
+    const amp = 0.15 + rpmNorm * 0.55; // 0.15–0.70 SVG units → ~0.6–2.8 px a escala ×4
+    const dx  = amp * 0.4  * Math.sin(timestamp * 0.071);
+    const dy  = amp * (Math.sin(timestamp * 0.047) + 0.35 * Math.sin(timestamp * 0.131));
+    carroceriaEl.setAttribute('transform', `translate(${dx.toFixed(3)},${dy.toFixed(3)})`);
+  } else {
+    carroceriaEl.setAttribute('transform', 'translate(0,0)');
+  }
 
   renderCaja();
   updateGauge(Math.abs(vel) * SLOPE_M * 3600);
