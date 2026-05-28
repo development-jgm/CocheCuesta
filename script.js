@@ -12,6 +12,16 @@ const humoSvg      = document.getElementById('humo');
 const CAJA_W = 320;
 const CAJA_H = 160;
 
+// Ratios de marchas (velocidad máxima en cada marcha como % de MAX_VEL)
+const GEAR_RATIOS = {
+  'N': 0.0,
+  '1': 0.3,
+  '2': 0.5,
+  '3': 0.7,
+  '4': 0.85,
+  '5': 1.0
+};
+
 // Parámetros del modelo — sobreescritos por config.json al arrancar
 let SLOPE_M           = 30;
 let MAX_VEL           = 0.0008;
@@ -130,9 +140,12 @@ function animate(timestamp) {
   // Gravedad: siempre cuesta abajo (vel negativa)
   const gravVelTarget = -MAX_VEL * Math.sin(theta);
 
-  // Motor: cuesta arriba proporcional al embrague soltado
+  // Motor: cuesta arriba proporcional al embrague soltado y acelerador
   const engagement    = gear !== 'N' ? Math.max(0, 1 - clutchValue / 100) : 0;
-  let engineVelTarget = (engineRunning && !engineStalled) ? ENGINE_MAX_VEL * engagement : 0;
+  const gearRatio     = GEAR_RATIOS[gear] || 0;
+  const accelFactor   = acceleratorValue / 100; // 0 a 1 según pedal acelerador
+  const motorVelMax   = MAX_VEL * gearRatio * accelFactor; // velocidad máxima según marcha y acelerador
+  let engineVelTarget = (engineRunning && !engineStalled && engagement < STALL_THRESHOLD) ? motorVelMax * engagement : 0;
 
   // Target combinado, luego frenado
   const physTarget = gravVelTarget + engineVelTarget;
