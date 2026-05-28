@@ -196,7 +196,7 @@ function animate(timestamp) {
     const spawnRate = 0.06 + (rpm / RPM_MAX) * 0.14; // leve en ralentí, aumenta con acelerador
     const toSpawn = Math.round(spawnRate * dt); // usar round en lugar de floor
     if (toSpawn > 0) {
-      spawnSmoke(3, 29, toSpawn, rpm); // salida del tubo de escape en coordenadas SVG
+      spawnSmoke(3, 27, toSpawn, rpm); // salida del tubo de escape en coordenadas SVG
     }
   }
 }
