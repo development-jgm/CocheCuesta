@@ -113,7 +113,7 @@ body {
 
 #cockpit {
   position: absolute;
-  top: -5px;
+  top: 15px;
   left: -5px;
   z-index: 10;
   overflow: hidden;
@@ -121,7 +121,7 @@ body {
 
 #pedals-gauge {
   position: absolute;
-  top: -5px;
+  top: 15px;
   left: 495px;
   z-index: 10;
   overflow: hidden;
