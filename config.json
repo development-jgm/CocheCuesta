@@ -19,7 +19,7 @@
   "embrague": {
     "umbral_activacion_marchas_pct": 97,
     "umbral_calado": 0.75,
-    "tiempo_calado_ms": 1500
+    "tiempo_calado_ms": 600
   },
   "audio": {
     "frecuencia_ralenti_hz": 47,
