@@ -15,10 +15,10 @@ const CAJA_H = 160;
 // Ratios de marchas (velocidad máxima en cada marcha como % de MAX_VEL)
 const GEAR_RATIOS = {
   'N': 0.0,
-  '1': 0.3,
-  '2': 0.5,
-  '3': 0.7,
-  '4': 0.85,
+  '1': 0.45,
+  '2': 0.6,
+  '3': 0.75,
+  '4': 0.9,
   '5': 1.0
 };
 
