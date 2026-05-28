@@ -12,7 +12,7 @@ const CAJA_W     = 320;
 const CAJA_H     = 160;
 const MAX_VEL        = 0.0008; // velocidad máx cuesta abajo (sin freno, sin motor)
 const ENGINE_MAX_VEL = 0.0003; // a ralentí apenas arrastra; necesita gas para subir pendientes
-const STALL_TIME     = 800;   // ms de sobrecarga antes de calarse
+const STALL_TIME     = 1500;  // ms de sobrecarga antes de calarse
 const ACCEL_RATE     = 0.003;
 const BRAKE_RATE     = 0.05;
 
@@ -96,7 +96,7 @@ function animate(timestamp) {
   // ── Lógica de calado ──────────────────────────────────────────────────────
   // A ralentí, soltar el embrague más del 65% de recorrido cala el motor
   if (!engineStalled && gear !== 'N') {
-    if (engagement > 0.65) {
+    if (engagement > 0.75) {
       stallTimer += dt;
       if (stallTimer >= STALL_TIME) engineStalled = true;
     } else {
