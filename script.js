@@ -7,6 +7,7 @@ const frenoMano  = document.getElementById('frenoMano');
 const wfEl         = document.getElementById('wf');
 const wrEl         = document.getElementById('wr');
 const carroceriaEl = document.getElementById('carroceria');
+const humoSvg      = document.getElementById('humo');
 
 const CAJA_W = 320;
 const CAJA_H = 160;
@@ -188,6 +189,24 @@ function animate(timestamp) {
     : 0;
   updateRpmGauge(rpm);
   updateEngineSound(acceleratorValue, engineRunning && !engineStalled);
+
+  // Partículas de humo proporcionales a RPM
+  updateParticles(dt);
+  if (engineRunning && !engineStalled) {
+    const spawnRate = (rpm / RPM_MAX) * 0.08; // máx 0.08 partículas/ms ≈ 8 por frame
+    const toSpawn = Math.floor(spawnRate * dt);
+    if (toSpawn > 0) {
+      // Tubo de escape en coordenadas SVG: (76, 28) ≈ esquina trasera inferior
+      // Transformar a coordenadas pantalla: escala ×4, posición del coche
+      const cajaRect = caja.getBoundingClientRect();
+      const rectRect = rectEl.getBoundingClientRect();
+      const escapeLocalX = 76 * 4; // en px dentro del SVG caja
+      const escapeLocalY = 28 * 4;
+      const escapeScreenX = cajaRect.left + escapeLocalX - rectRect.left;
+      const escapeScreenY = cajaRect.top + escapeLocalY - rectRect.top;
+      spawnSmoke(escapeScreenX, escapeScreenY, toSpawn);
+    }
+  }
 }
 
 function reset() {
@@ -483,6 +502,75 @@ function updateStallLight(stalled) {
   }
 }
 
+// ── Partículas de humo ────────────────────────────────────────────────────────
+
+class Particle {
+  constructor(el) {
+    this.el = el;
+    this.reset();
+  }
+  reset() {
+    this.age = 0;
+    this.life = 2000;
+    this.x = 0;
+    this.y = 0;
+    this.vx = 0;
+    this.vy = 0;
+    this.r = 0;
+  }
+}
+
+const PARTICLE_POOL_SIZE = 150;
+const particles = [];
+let particlePool = [];
+
+function initParticlePool() {
+  for (let i = 0; i < PARTICLE_POOL_SIZE; i++) {
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('fill', '#999');
+    circle.setAttribute('opacity', '0');
+    humoSvg.appendChild(circle);
+    particles.push(new Particle(circle));
+  }
+  particlePool = [...particles];
+}
+
+function spawnSmoke(escapeX, escapeY, count) {
+  for (let i = 0; i < count; i++) {
+    if (particlePool.length === 0) break;
+    const p = particlePool.pop();
+    p.reset();
+    p.age = 0;
+    p.life = 1500 + Math.random() * 500;
+    p.x = escapeX + (Math.random() - 0.5) * 8;
+    p.y = escapeY + (Math.random() - 0.5) * 4;
+    p.vx = (Math.random() - 0.5) * 0.08;
+    p.vy = -0.12 - Math.random() * 0.08;
+    p.r = 3 + Math.random() * 2;
+  }
+}
+
+function updateParticles(dt) {
+  for (let i = 0; i < particles.length; i++) {
+    const p = particles[i];
+    if (p.age >= p.life) {
+      if (particlePool.indexOf(p) === -1) particlePool.push(p);
+      continue;
+    }
+    p.age += dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    const prog = p.age / p.life;
+    const opacity = (1 - prog) * (1 - prog);
+    const radius = p.r * (1 + prog * 2);
+
+    p.el.setAttribute('cx', p.x);
+    p.el.setAttribute('cy', p.y);
+    p.el.setAttribute('r', radius);
+    p.el.setAttribute('opacity', opacity.toFixed(3));
+  }
+}
+
 // ── Audio: sonido del motor ───────────────────────────────────────────────────
 
 let audioCtx    = null;
@@ -597,6 +685,7 @@ function updateEngineSound(accelPct, running) {
 loadConfig().then(() => {
   posX = INITIAL_POSX;
   initGauge();
+  initParticlePool();
   requestAnimationFrame(animate);
   autoConnectArduino(); // intenta reconectar silenciosamente si hay permiso previo
 });
