@@ -168,7 +168,8 @@ function animate(timestamp) {
   const minAccelForMaintain = isDescending ? 0.15 : 0.02;
   const isAcceleratingEnough = accelFactor >= minAccelForMaintain;
   const hasEnoughSpeed = vel < 0 && Math.abs(vel) > ENGINE_MAX_VEL * 0.5; // inercia de bajada
-  const strongBrake = effectiveBrake > 50; // freno muy fuerte
+  const totalBrake = Math.max(handbrake ? 100 : 0, brakeValue); // máximo de ambos frenos
+  const strongBrake = totalBrake > 50; // freno muy fuerte
   // Umbral más bajo si hay freno fuerte (motor se cala antes al soltar embrague con freno)
   const effectiveStallThreshold = strongBrake ? 0.33 : STALL_THRESHOLD;
   const shouldStall = engagement > effectiveStallThreshold && !isAcceleratingEnough &&
