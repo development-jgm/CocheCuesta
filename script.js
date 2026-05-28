@@ -11,7 +11,8 @@ const SLOPE_M    = 30;    // longitud virtual de la cuesta en metros
 const CAJA_W     = 320;
 const CAJA_H     = 160;
 const MAX_VEL        = 0.0008; // velocidad máx cuesta abajo (sin freno, sin motor)
-const ENGINE_MAX_VEL = 0.0014; // velocidad máx cuesta arriba (embrague totalmente soltado)
+const ENGINE_MAX_VEL = 0.0003; // a ralentí apenas arrastra; necesita gas para subir pendientes
+const STALL_TIME     = 800;   // ms de sobrecarga antes de calarse
 const ACCEL_RATE     = 0.003;
 const BRAKE_RATE     = 0.05;
 
@@ -22,6 +23,8 @@ let lastTime     = null;
 let brakeValue       = 0;
 let clutchValue      = 0;   // 0 = sin pisar, 100 = a fondo
 let gear             = 'N';
+let engineStalled    = false;
+let stallTimer       = 0;
 let handbrake        = true;
 let arduinoConnected = false;
 
@@ -84,14 +87,29 @@ function animate(timestamp) {
   const gravVelTarget = -MAX_VEL * Math.sin(theta);
 
   // Motor: cuesta arriba proporcional al embrague soltado
-  let engineVelTarget = 0;
-  if (gear !== 'N') {
-    const engagement = Math.max(0, 1 - clutchValue / 100);
-    engineVelTarget  = ENGINE_MAX_VEL * engagement;
-  }
+  const engagement    = gear !== 'N' ? Math.max(0, 1 - clutchValue / 100) : 0;
+  let engineVelTarget = engineStalled ? 0 : ENGINE_MAX_VEL * engagement;
 
   // Target combinado, luego frenado
   const physTarget = gravVelTarget + engineVelTarget;
+
+  // ── Lógica de calado ──────────────────────────────────────────────────────
+  if (!engineStalled && gear !== 'N' && engagement > 0.5 && physTarget < 0) {
+    // Motor sobrecargado: la cuesta supera la fuerza a ralentí
+    stallTimer += dt;
+    if (stallTimer >= STALL_TIME) {
+      engineStalled     = true;
+      engineVelTarget   = 0;
+    }
+  } else {
+    stallTimer = Math.max(0, stallTimer - dt * 2); // se recupera si la carga baja
+  }
+  // Arrancar: embrague a fondo reinicia el motor
+  if (engineStalled && clutchValue >= 97) {
+    engineStalled = false;
+    stallTimer    = 0;
+  }
+  updateStallLight(engineStalled);
   const targetVel  = effectiveBrake >= 97 ? 0 : physTarget * (1 - effectiveBrake / 100);
 
   const decelerating = Math.abs(targetVel) < Math.abs(vel) ||
@@ -256,6 +274,19 @@ function initGauge() {
     x: GCX, y: GCY + 79, 'text-anchor': 'middle', 'dominant-baseline': 'middle',
     fill: '#2a2a2a', 'font-size': 7, 'font-family': "'Courier New',monospace"
   }, '00000 km'));
+
+  // Testigo de motor calado (apagado por defecto)
+  svg.appendChild(svgEl('circle', { id: 'stallLight', cx: GCX - 55, cy: GCY + 75, r: 7, fill: '#1a0000' }));
+  svg.appendChild(svgEl('text', {
+    x: GCX - 55, y: GCY + 88, 'text-anchor': 'middle',
+    fill: '#2a0000', 'font-size': 6, 'font-family': 'Arial,sans-serif', 'letter-spacing': 0.5
+  }, 'MOTOR'));
+  svg.appendChild(svgEl('text', {
+    id: 'stallText',
+    x: GCX + 10, y: GCY + 88, 'text-anchor': 'middle',
+    fill: '#1a0000', 'font-size': 7.5, 'font-family': 'Arial,sans-serif',
+    'font-weight': 'bold', 'letter-spacing': 1
+  }, 'CALADO'));
 }
 
 function updateGauge(speedKmh) {
@@ -276,6 +307,21 @@ function updateGauge(speedKmh) {
   }
 
   document.getElementById('gaugeDigital').textContent = speedKmh.toFixed(1);
+}
+
+function updateStallLight(stalled) {
+  const light = document.getElementById('stallLight');
+  const text  = document.getElementById('stallText');
+  if (!light || !text) return;
+  if (stalled) {
+    light.setAttribute('fill', '#ff2020');
+    light.setAttribute('filter', 'url(#glow)');
+    text.setAttribute('fill', '#ff4040');
+  } else {
+    light.setAttribute('fill', '#1a0000');
+    light.removeAttribute('filter');
+    text.setAttribute('fill', '#1a0000');
+  }
 }
 
 initGauge();
