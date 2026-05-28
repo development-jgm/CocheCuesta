@@ -226,6 +226,7 @@ function animate(timestamp) {
     ? RPM_IDLE + (acceleratorValue / 100) * (RPM_MAX - RPM_IDLE)
     : 0;
   updateRpmGauge(rpm);
+  updatePedalsGauge();
   updateEngineSound(acceleratorValue, engineRunning && !engineStalled);
 
   // Partículas de humo proporcionales a RPM (coordenadas SVG diretas)
@@ -515,6 +516,34 @@ function updateGauge(speedKmh) {
   }
 
   document.getElementById('gaugeDigital').textContent = speedKmh.toFixed(1);
+}
+
+function updatePedalsGauge() {
+  const clutchFill = document.getElementById('clutch-fill');
+  const brakeFill = document.getElementById('brake-fill');
+  const accelFill = document.getElementById('accel-fill');
+
+  // Altura total: 200 SVG units
+  const totalHeight = 200;
+  const maxY = 10;
+
+  // Embrague: 0-100 → altura 0-200
+  const clutchHeight = (clutchValue / 100) * totalHeight;
+  const clutchY = maxY + totalHeight - clutchHeight;
+  clutchFill.setAttribute('y', clutchY);
+  clutchFill.setAttribute('height', clutchHeight);
+
+  // Freno: 0-100 → altura 0-200
+  const brakeHeight = (brakeValue / 100) * totalHeight;
+  const brakeY = maxY + totalHeight - brakeHeight;
+  brakeFill.setAttribute('y', brakeY);
+  brakeFill.setAttribute('height', brakeHeight);
+
+  // Acelerador: 0-100 → altura 0-200
+  const accelHeight = (acceleratorValue / 100) * totalHeight;
+  const accelY = maxY + totalHeight - accelHeight;
+  accelFill.setAttribute('y', accelY);
+  accelFill.setAttribute('height', accelHeight);
 }
 
 function updateStallLight(stalled) {

@@ -34,6 +34,17 @@
     <div id="cockpit">
       <svg id="gauge" viewBox="0 0 480 220" width="480" height="220"></svg>
     </div>
+    <svg id="pedals-gauge" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 220" width="60" height="220">
+      <!-- Embrague (izquierda) -->
+      <rect x="5" y="10" width="12" height="200" fill="none" stroke="#666" stroke-width="1.5" rx="2"/>
+      <rect id="clutch-fill" x="5" y="10" width="12" height="200" fill="#4a90e2" rx="2"/>
+      <!-- Freno (centro) -->
+      <rect x="24" y="10" width="12" height="200" fill="none" stroke="#666" stroke-width="1.5" rx="2"/>
+      <rect id="brake-fill" x="24" y="10" width="12" height="200" fill="#e74c3c" rx="2"/>
+      <!-- Acelerador (derecha) -->
+      <rect x="43" y="10" width="12" height="200" fill="none" stroke="#666" stroke-width="1.5" rx="2"/>
+      <rect id="accel-fill" x="43" y="10" width="12" height="200" fill="#2ecc71" rx="2"/>
+    </svg>
     <div class="triangulo" id="triangulo"></div>
     <svg id="caja" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 40" width="320" height="160">
       <!-- Tubo de escape (capa más inferior, se dibuja primero) -->
