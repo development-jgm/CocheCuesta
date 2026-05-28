@@ -193,10 +193,10 @@ function animate(timestamp) {
   // Partículas de humo proporcionales a RPM (coordenadas SVG diretas)
   updateParticles(dt);
   if (engineRunning && !engineStalled) {
-    const spawnRate = 0.08 + (rpm / RPM_MAX) * 0.15; // ralentí leve, máximo con aceleración
+    const spawnRate = 0.015 + (rpm / RPM_MAX) * 0.08; // muy leve en ralentí, aumenta con acelerador
     const toSpawn = Math.floor(spawnRate * dt);
     if (toSpawn > 0) {
-      spawnSmoke(3, -17, toSpawn); // salida del tubo de escape en coordenadas SVG
+      spawnSmoke(3, -17, toSpawn, rpm); // salida del tubo de escape en coordenadas SVG
     }
   }
 }
@@ -527,7 +527,8 @@ function initParticlePool() {
   particlePool = [...particles];
 }
 
-function spawnSmoke(escapeX, escapeY, count) {
+function spawnSmoke(escapeX, escapeY, count, rpm) {
+  const accelFactor = rpm / RPM_MAX; // 0 (ralentí) a 1 (fondo)
   for (let i = 0; i < count; i++) {
     if (particlePool.length === 0) break;
     const p = particlePool.pop();
@@ -536,9 +537,10 @@ function spawnSmoke(escapeX, escapeY, count) {
     p.life = 1500 + Math.random() * 500;
     p.x = escapeX + (Math.random() - 0.5) * 8;
     p.y = escapeY + (Math.random() - 0.5) * 4;
-    p.vx = (Math.random() - 0.5) * 0.08;
-    p.vy = -0.12 - Math.random() * 0.08;
-    p.r = 1.5 + Math.random() * 1; // mitad del tamaño anterior
+    p.vx = (Math.random() - 0.5) * 0.08 * accelFactor;
+    const baseVy = 0.06 + accelFactor * 0.12; // ralentí 0.06, fondo 0.18
+    p.vy = -baseVy - Math.random() * (0.05 * accelFactor);
+    p.r = 1.5 + Math.random() * 1;
   }
 }
 
