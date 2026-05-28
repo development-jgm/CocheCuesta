@@ -18,5 +18,12 @@
     "umbral_activacion_marchas_pct": 97,
     "umbral_calado": 0.75,
     "tiempo_calado_ms": 1500
+  },
+  "audio": {
+    "frecuencia_ralenti_hz": 65,
+    "frecuencia_max_hz": 210,
+    "volumen_ralenti": 0.07,
+    "volumen_max": 0.45,
+    "inercia_motor_s": 0.18
   }
 }

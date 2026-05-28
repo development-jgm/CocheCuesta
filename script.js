@@ -21,6 +21,11 @@ let STALL_THRESHOLD   = 0.75;
 let BRAKE_DEADBAND    = 97;
 let CLUTCH_ENABLE_THR = 97;
 let INITIAL_POSX      = 0.9;
+let AUDIO_FREQ_IDLE   = 65;
+let AUDIO_FREQ_MAX    = 210;
+let AUDIO_VOL_IDLE    = 0.07;
+let AUDIO_VOL_MAX     = 0.45;
+let AUDIO_INERTIA     = 0.18;
 
 async function loadConfig() {
   try {
@@ -35,6 +40,11 @@ async function loadConfig() {
     CLUTCH_ENABLE_THR = cfg.embrague?.umbral_activacion_marchas_pct  ?? CLUTCH_ENABLE_THR;
     STALL_THRESHOLD   = cfg.embrague?.umbral_calado                  ?? STALL_THRESHOLD;
     STALL_TIME        = cfg.embrague?.tiempo_calado_ms               ?? STALL_TIME;
+    AUDIO_FREQ_IDLE   = cfg.audio?.frecuencia_ralenti_hz             ?? AUDIO_FREQ_IDLE;
+    AUDIO_FREQ_MAX    = cfg.audio?.frecuencia_max_hz                 ?? AUDIO_FREQ_MAX;
+    AUDIO_VOL_IDLE    = cfg.audio?.volumen_ralenti                   ?? AUDIO_VOL_IDLE;
+    AUDIO_VOL_MAX     = cfg.audio?.volumen_max                       ?? AUDIO_VOL_MAX;
+    AUDIO_INERTIA     = cfg.audio?.inercia_motor_s                   ?? AUDIO_INERTIA;
   } catch {
     console.warn('config.json no encontrado — usando valores por defecto');
   }
@@ -45,7 +55,8 @@ let wheelAngle   = 0; // grados acumulados de rotación de las ruedas
 let vel          = 0;
 let lastTime     = null;
 let brakeValue       = 0;
-let clutchValue      = 0;   // 0 = sin pisar, 100 = a fondo
+let clutchValue      = 0;
+let acceleratorValue = 0;
 let gear             = 'N';
 let engineStalled    = false;
 let stallTimer       = 0;
@@ -153,6 +164,7 @@ function animate(timestamp) {
 
   renderCaja();
   updateGauge(Math.abs(vel) * SLOPE_M * 3600);
+  updateEngineSound(acceleratorValue, !engineStalled);
 }
 
 function reset() {
@@ -347,6 +359,52 @@ function updateStallLight(stalled) {
   }
 }
 
+// ── Audio: sonido del motor ───────────────────────────────────────────────────
+
+let audioCtx   = null;
+let engineOsc  = null;
+let engineFilt = null;
+let engineGain = null;
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  engineOsc = audioCtx.createOscillator();
+  engineOsc.type = 'sawtooth';
+  engineOsc.frequency.setValueAtTime(AUDIO_FREQ_IDLE, audioCtx.currentTime);
+
+  engineFilt = audioCtx.createBiquadFilter();
+  engineFilt.type = 'lowpass';
+  engineFilt.frequency.setValueAtTime(400, audioCtx.currentTime);
+  engineFilt.Q.setValueAtTime(2, audioCtx.currentTime);
+
+  engineGain = audioCtx.createGain();
+  engineGain.gain.setValueAtTime(AUDIO_VOL_IDLE, audioCtx.currentTime);
+
+  engineOsc.connect(engineFilt);
+  engineFilt.connect(engineGain);
+  engineGain.connect(audioCtx.destination);
+  engineOsc.start();
+}
+
+function updateEngineSound(accelPct, running) {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  if (!running) {
+    engineGain.gain.setTargetAtTime(0, t, 0.1);
+    return;
+  }
+  const freq = AUDIO_FREQ_IDLE + (accelPct / 100) * (AUDIO_FREQ_MAX - AUDIO_FREQ_IDLE);
+  const vol  = AUDIO_VOL_IDLE  + (accelPct / 100) * (AUDIO_VOL_MAX  - AUDIO_VOL_IDLE);
+  // Filtro más abierto a altas revoluciones
+  const fcut = 300 + (accelPct / 100) * 1200;
+
+  engineOsc.frequency.setTargetAtTime(freq, t, AUDIO_INERTIA);
+  engineGain.gain.setTargetAtTime(vol,  t, AUDIO_INERTIA);
+  engineFilt.frequency.setTargetAtTime(fcut, t, AUDIO_INERTIA);
+}
+
 loadConfig().then(() => {
   posX = INITIAL_POSX; // aplicar posición inicial del config
   initGauge();
@@ -357,6 +415,7 @@ loadConfig().then(() => {
 
 frenoMano.addEventListener('change', async () => {
   handbrake = frenoMano.checked;
+  initAudio(); // primer gesto del usuario → AudioContext permitido
   if (!handbrake && !arduinoConnected) {
     await connectArduino();
   }
@@ -393,6 +452,10 @@ async function connectArduino() {
         if (!isNaN(rawClutch)) {
           clutchValue = Math.max(0, Math.min(100, rawClutch));
           updateGearSelector();
+        }
+        const rawAccel = parseInt(parts[2], 10);
+        if (!isNaN(rawAccel)) {
+          acceleratorValue = Math.max(0, Math.min(100, rawAccel));
         }
       }
     }
