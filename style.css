@@ -120,3 +120,39 @@ body {
   z-index: 1;
   overflow: visible;
 }
+
+#stall-message {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 100;
+  font-size: 4vw;
+  font-weight: bold;
+  color: #ff2c2c;
+  text-shadow: 0 0 20px rgba(255, 44, 44, 0.8), 0 0 40px rgba(255, 44, 44, 0.5);
+  font-family: Arial, sans-serif;
+  letter-spacing: 3px;
+  pointer-events: none;
+  white-space: nowrap;
+  opacity: 0;
+  animation: stall-pop 2s ease-out forwards;
+}
+
+@keyframes stall-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.3);
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+    transform: translate(-50%, -150%) scale(1.5);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -250%) scale(1.8);
+  }
+}

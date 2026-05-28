@@ -703,6 +703,15 @@ function updateEngineSound(accelPct, running) {
   engineGain.gain.setTargetAtTime(vol, t, AUDIO_INERTIA);
 }
 
+function showStallMessage() {
+  const stallMsg = document.getElementById('stall-message');
+  // Fuerza el reflow para reiniciar la animación
+  stallMsg.style.animation = 'none';
+  setTimeout(() => {
+    stallMsg.style.animation = 'stall-pop 2s ease-out forwards';
+  }, 10);
+}
+
 loadConfig().then(() => {
   applyPendiente(Number(slider.value));
   posX = INITIAL_POSX;
@@ -710,6 +719,8 @@ loadConfig().then(() => {
   initParticlePool();
   requestAnimationFrame(animate);
   autoConnectArduino(); // intenta reconectar silenciosamente si hay permiso previo
+  // Testing: mostrar mensaje al cargar (quitar después)
+  setTimeout(() => showStallMessage(), 500);
 });
 
 // ── Freno de mano + Web Serial ────────────────────────────────────────────────
