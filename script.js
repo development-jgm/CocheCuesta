@@ -146,7 +146,7 @@ function animate(timestamp) {
   const accelFactor   = acceleratorValue / 100; // 0 a 1 según pedal acelerador
   // Velocidad base en ralentí + incremento según acelerador y marcha
   const motorVelMax   = ENGINE_MAX_VEL + (MAX_VEL - ENGINE_MAX_VEL) * gearRatio * accelFactor;
-  let engineVelTarget = (engineRunning && !engineStalled && engagement < STALL_THRESHOLD) ? motorVelMax * engagement : 0;
+  let engineVelTarget = (engineRunning && !engineStalled && gear !== 'N') ? motorVelMax * engagement : 0;
 
   // Target combinado, luego frenado
   const physTarget = gravVelTarget + engineVelTarget;
