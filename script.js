@@ -201,7 +201,7 @@ function animate(timestamp) {
       const cajaRect = caja.getBoundingClientRect();
       const rectRect = rectEl.getBoundingClientRect();
       const escapeLocalX = 3 * 4; // en px dentro del SVG caja
-      const escapeLocalY = 31 * 4;
+      const escapeLocalY = 31 * 4 - 200; // DEBUG: subir 200px
       const escapeScreenX = cajaRect.left + escapeLocalX - rectRect.left;
       const escapeScreenY = cajaRect.top + escapeLocalY - rectRect.top;
       spawnSmoke(escapeScreenX, escapeScreenY, toSpawn);
