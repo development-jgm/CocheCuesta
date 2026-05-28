@@ -49,6 +49,16 @@ body {
   clip-path: polygon(0% 100%, 100% 100%, 100% 0%);
 }
 
+#cockpit {
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  z-index: 10;
+  background: #0d0d0d;
+  border-bottom-right-radius: 16px;
+  overflow: hidden;
+}
+
 #caja {
   position: absolute;
   z-index: 1;
