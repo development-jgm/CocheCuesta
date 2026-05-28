@@ -1,7 +1,7 @@
 {
   "simulacion": {
     "longitud_cuesta_m": 30,
-    "posicion_inicial": 0.9
+    "posicion_inicial": 0.5
   },
   "fisica": {
     "velocidad_max_bajada": 0.0008,
