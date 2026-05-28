@@ -178,8 +178,8 @@ function animate(timestamp) {
       stallTimer = 0;
     }
   }
-  // Arrancar: embrague a fondo reinicia el motor
-  if (engineStalled && clutchValue >= CLUTCH_ENABLE_THR) {
+  // Arrantar: requiere casilla marcada + embrague a fondo para reiniciar
+  if (engineStalled && clutchValue >= CLUTCH_ENABLE_THR && arrancarEl.checked) {
     engineStalled = false;
     stallTimer    = 0;
   }
