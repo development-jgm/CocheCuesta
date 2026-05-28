@@ -170,8 +170,8 @@ function animate(timestamp) {
   const hasEnoughSpeed = vel < 0 && Math.abs(vel) > ENGINE_MAX_VEL * 0.5; // inercia de bajada
   const totalBrake = Math.max(handbrake ? 100 : 0, brakeValue); // máximo de ambos frenos
   const strongBrake = totalBrake > 50; // freno muy fuerte
-  // Umbral más bajo si hay freno fuerte (motor se cala cuando embrague está ~50% soltado)
-  const effectiveStallThreshold = strongBrake ? 0.5 : STALL_THRESHOLD;
+  // Umbral más bajo si hay freno fuerte (motor se cala cuando embrague está ~40-45% soltado)
+  const effectiveStallThreshold = strongBrake ? 0.4 : STALL_THRESHOLD;
   // Tiempo de calado más corto con freno fuerte (150ms vs 600ms normal)
   const effectiveStallTime = (strongBrake && acceleratorValue <= 0) ? 150 : STALL_TIME;
   const shouldStall = engagement > effectiveStallThreshold && !isAcceleratingEnough &&
