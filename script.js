@@ -159,7 +159,7 @@ function animate(timestamp) {
   // Cuando está bajando, necesita más acelerador para no calarse
   const minAccelForMaintain = isDescending ? 0.15 : 0.02;
   const isAcceleratingEnough = accelFactor >= minAccelForMaintain;
-  const hasEnoughSpeed = Math.abs(vel) > ENGINE_MAX_VEL * 0.5; // suficiente inercia
+  const hasEnoughSpeed = vel < 0 && Math.abs(vel) > ENGINE_MAX_VEL * 0.5; // inercia de bajada
   if (engineRunning && !engineStalled && gear !== 'N') {
     if (engagement > STALL_THRESHOLD && !isAcceleratingEnough && !hasEnoughSpeed) {
       stallTimer += dt;
