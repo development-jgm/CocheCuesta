@@ -24,6 +24,16 @@ body {
   width: 200px;
 }
 
+.arrancar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  user-select: none;
+  color: #1a7a1a;
+}
+
 .freno-mano {
   display: flex;
   align-items: center;

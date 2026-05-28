@@ -58,6 +58,7 @@ let brakeValue       = 0;
 let clutchValue      = 0;
 let acceleratorValue = 0;
 let gear             = 'N';
+let engineRunning    = false;
 let engineStalled    = false;
 let stallTimer       = 0;
 let handbrake        = true;
@@ -123,14 +124,14 @@ function animate(timestamp) {
 
   // Motor: cuesta arriba proporcional al embrague soltado
   const engagement    = gear !== 'N' ? Math.max(0, 1 - clutchValue / 100) : 0;
-  let engineVelTarget = engineStalled ? 0 : ENGINE_MAX_VEL * engagement;
+  let engineVelTarget = (engineRunning && !engineStalled) ? ENGINE_MAX_VEL * engagement : 0;
 
   // Target combinado, luego frenado
   const physTarget = gravVelTarget + engineVelTarget;
 
   // ── Lógica de calado ──────────────────────────────────────────────────────
   // A ralentí, soltar el embrague más del 65% de recorrido cala el motor
-  if (!engineStalled && gear !== 'N') {
+  if (engineRunning && !engineStalled && gear !== 'N') {
     if (engagement > STALL_THRESHOLD) {
       stallTimer += dt;
       if (stallTimer >= STALL_TIME) engineStalled = true;
@@ -164,7 +165,7 @@ function animate(timestamp) {
 
   renderCaja();
   updateGauge(Math.abs(vel) * SLOPE_M * 3600);
-  updateEngineSound(acceleratorValue, !engineStalled);
+  updateEngineSound(acceleratorValue, engineRunning && !engineStalled);
 }
 
 function reset() {
@@ -414,8 +415,15 @@ loadConfig().then(() => {
 
 // ── Freno de mano + Web Serial ────────────────────────────────────────────────
 
-// AudioContext requiere gesto del usuario — cualquier click es suficiente
-document.addEventListener('click', () => initAudio(), { once: true });
+const arrancarEl = document.getElementById('arrancar');
+arrancarEl.addEventListener('change', () => {
+  engineRunning = arrancarEl.checked;
+  if (engineRunning) {
+    initAudio();       // gesto del usuario → AudioContext permitido
+    engineStalled = false; // arranque limpio (también re-arranca tras calado)
+    stallTimer    = 0;
+  }
+});
 
 frenoMano.addEventListener('change', async () => {
   handbrake = frenoMano.checked;
