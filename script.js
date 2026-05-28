@@ -181,6 +181,7 @@ function animate(timestamp) {
         engineStalled = true;
         showStallMessage();
         shakeOnStall();
+        playStallSound();
       }
     } else {
       stallTimer = 0;
@@ -724,6 +725,54 @@ function initAudio() {
   engineOsc2.start();
   engineOsc3.start();
   idleLfo.start();
+}
+
+function playStallSound() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+
+  // Crear nodo de ruido blanco para el "crash"
+  const bufferSize = audioCtx.sampleRate * 0.15;
+  const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const noiseData = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) {
+    noiseData[i] = Math.random() * 2 - 1;
+  }
+  const noiseSource = audioCtx.createBufferSource();
+  noiseSource.buffer = noiseBuffer;
+
+  // Filtrar ruido a bajas frecuencias para el "golpe"
+  const noiseLpf = audioCtx.createBiquadFilter();
+  noiseLpf.type = 'lowpass';
+  noiseLpf.frequency.value = 150;
+  noiseLpf.Q.value = 1;
+
+  // Envolvente rápida: spike de volumen → decay
+  const noiseGain = audioCtx.createGain();
+  noiseGain.gain.setValueAtTime(0.8, t);
+  noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+
+  noiseSource.connect(noiseLpf);
+  noiseLpf.connect(noiseGain);
+  noiseGain.connect(audioCtx.destination);
+
+  noiseSource.start(t);
+  noiseSource.stop(t + 0.15);
+
+  // Oscilador de "click" agudo al final
+  const clickOsc = audioCtx.createOscillator();
+  clickOsc.frequency.setValueAtTime(300, t + 0.1);
+  clickOsc.frequency.exponentialRampToValueAtTime(80, t + 0.12);
+
+  const clickGain = audioCtx.createGain();
+  clickGain.gain.setValueAtTime(0.3, t + 0.1);
+  clickGain.gain.exponentialRampToValueAtTime(0, t + 0.12);
+
+  clickOsc.connect(clickGain);
+  clickGain.connect(audioCtx.destination);
+
+  clickOsc.start(t + 0.1);
+  clickOsc.stop(t + 0.12);
 }
 
 function updateEngineSound(accelPct, running) {
