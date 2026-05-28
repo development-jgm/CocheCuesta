@@ -678,6 +678,7 @@ function updateEngineSound(accelPct, running) {
 }
 
 loadConfig().then(() => {
+  applyPendiente(Number(slider.value));
   posX = INITIAL_POSX;
   initGauge();
   initParticlePool();
