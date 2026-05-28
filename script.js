@@ -516,7 +516,9 @@ function updateGauge(speedKmh) {
 function updateStallLight(stalled) {
   const light = document.getElementById('stallLight');
   const text  = document.getElementById('stallText');
-  arrancarEl.disabled = stalled;
+  // Desactiva la casilla si está calado, pero reactiva si presiona clutch a fondo
+  const clutchFull = clutchValue >= CLUTCH_ENABLE_THR;
+  arrancarEl.disabled = stalled && !clutchFull;
   arrancarEl.checked = !stalled && arrancarEl.checked;
   if (!light || !text) return;
   if (stalled) {
