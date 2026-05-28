@@ -1,0 +1,50 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+}
+
+.controles {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.controles input[type="range"] {
+  width: 200px;
+}
+
+.cuadrado {
+  width: 80vw;
+  height: 80vh;
+  background-color: white;
+  border: 5px solid black;
+  position: relative;
+  overflow: hidden;
+}
+
+.triangulo {
+  position: absolute;
+  inset: 0;
+  background-color: #9C6B3C;
+  clip-path: polygon(0% 100%, 100% 100%, 100% 0%);
+}
+
+.caja {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  background-color: #2196F3;
+  border: 2px solid #0d47a1;
+  z-index: 1;
+}
