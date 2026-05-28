@@ -705,11 +705,10 @@ function updateEngineSound(accelPct, running) {
 
 function showStallMessage() {
   const stallMsg = document.getElementById('stall-message');
-  // Fuerza el reflow para reiniciar la animación
-  stallMsg.style.animation = 'none';
-  setTimeout(() => {
-    stallMsg.style.animation = 'stall-pop 2s ease-out forwards';
-  }, 10);
+  stallMsg.classList.remove('show');
+  // Fuerza reflow para reiniciar animación
+  void stallMsg.offsetWidth;
+  stallMsg.classList.add('show');
 }
 
 loadConfig().then(() => {

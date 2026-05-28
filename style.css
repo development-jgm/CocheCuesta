@@ -136,6 +136,9 @@ body {
   pointer-events: none;
   white-space: nowrap;
   opacity: 0;
+}
+
+#stall-message.show {
   animation: stall-pop 2s ease-out forwards;
 }
 
