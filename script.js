@@ -90,7 +90,12 @@ function updateGearSelector() {
 }
 
 gearInputs.forEach(inp =>
-  inp.addEventListener('change', () => { if (!inp.disabled) gear = inp.value; })
+  inp.addEventListener('change', () => {
+    if (!inp.disabled) {
+      gear = inp.value;
+      stallTimer = 0; // resetea timer al cambiar marcha
+    }
+  })
 );
 
 // ── Pendiente ─────────────────────────────────────────────────────────────────
