@@ -516,6 +516,8 @@ function updateGauge(speedKmh) {
 function updateStallLight(stalled) {
   const light = document.getElementById('stallLight');
   const text  = document.getElementById('stallText');
+  arrancarEl.disabled = stalled;
+  arrancarEl.checked = !stalled && arrancarEl.checked;
   if (!light || !text) return;
   if (stalled) {
     light.setAttribute('fill', '#ff2020');
