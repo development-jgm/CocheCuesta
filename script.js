@@ -152,13 +152,15 @@ function animate(timestamp) {
   const physTarget = gravVelTarget + engineVelTarget;
 
   // ── Lógica de calado ──────────────────────────────────────────────────────
-  // A ralentí, soltar el embrague más del 65% de recorrido cala el motor
+  // Solo se cala si sueltas el embrague sin acelerar y sin suficiente velocidad
+  const isAccelerating = acceleratorValue > 0;
+  const hasEnoughSpeed = Math.abs(vel) > ENGINE_MAX_VEL * 0.5; // suficiente inercia
   if (engineRunning && !engineStalled && gear !== 'N') {
-    if (engagement > STALL_THRESHOLD) {
+    if (engagement > STALL_THRESHOLD && !isAccelerating && !hasEnoughSpeed) {
       stallTimer += dt;
       if (stallTimer >= STALL_TIME) engineStalled = true;
     } else {
-      stallTimer = 0; // embrague pisado suficiente: timer se resetea
+      stallTimer = 0; // acelerando o embrague pisado: no se cala
     }
   }
   // Arrancar: embrague a fondo reinicia el motor
