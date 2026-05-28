@@ -164,11 +164,15 @@ function animate(timestamp) {
   // ── Lógica de calado ──────────────────────────────────────────────────────
   // Se cala si embrague soltado sin acelerador suficiente y sin inercia
   // Cuando está bajando, necesita más acelerador para no calarse
+  // También se cala si hay freno fuerte (freno de mano o freno de pedal fuerte)
   const minAccelForMaintain = isDescending ? 0.15 : 0.02;
   const isAcceleratingEnough = accelFactor >= minAccelForMaintain;
   const hasEnoughSpeed = vel < 0 && Math.abs(vel) > ENGINE_MAX_VEL * 0.5; // inercia de bajada
+  const strongBrake = effectiveBrake > 50; // freno muy fuerte
+  const shouldStall = engagement > STALL_THRESHOLD && !isAcceleratingEnough &&
+                      (!hasEnoughSpeed || (strongBrake && acceleratorValue <= 0));
   if (engineRunning && !engineStalled && gear !== 'N') {
-    if (engagement > STALL_THRESHOLD && !isAcceleratingEnough && !hasEnoughSpeed) {
+    if (shouldStall) {
       stallTimer += dt;
       if (stallTimer >= STALL_TIME) {
         engineStalled = true;
