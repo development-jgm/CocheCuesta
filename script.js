@@ -179,6 +179,7 @@ function animate(timestamp) {
       if (stallTimer >= STALL_TIME) {
         engineStalled = true;
         showStallMessage();
+        shakeOnStall();
       }
     } else {
       stallTimer = 0;
@@ -756,6 +757,20 @@ function showStallMessage() {
   // Fuerza reflow para reiniciar animación
   void stallMsg.offsetWidth;
   stallMsg.classList.add('show');
+}
+
+function shakeOnStall() {
+  const caja = document.getElementById('caja');
+  const cockpit = document.getElementById('cockpit');
+
+  caja.classList.add('shake');
+  cockpit.classList.add('shake');
+
+  // Remover la clase después de que termine la animación
+  setTimeout(() => {
+    caja.classList.remove('shake');
+    cockpit.classList.remove('shake');
+  }, 600);
 }
 
 loadConfig().then(() => {
