@@ -144,9 +144,10 @@ function animate(timestamp) {
   const engagement    = gear !== 'N' ? Math.max(0, 1 - clutchValue / 100) : 0;
   const gearRatio     = GEAR_RATIOS[gear] || 0;
   const accelFactor   = acceleratorValue / 100; // 0 a 1 según pedal acelerador
-  // Velocidad base en ralentí + incremento según acelerador y engagement
-  // Soltar el embrague proporciona ~50% de aceleración incluso sin acelerador
-  const effectiveAccel = accelFactor + engagement * (1 - accelFactor) * 0.5;
+  // Boost de engagement solo si estamos bajando (necesitamos frenar la caída)
+  const isDescending = vel < -ENGINE_MAX_VEL * 0.1;
+  const engagementBoost = isDescending ? engagement * (1 - accelFactor) * 0.5 : 0;
+  const effectiveAccel = accelFactor + engagementBoost;
   const motorVelMax   = ENGINE_MAX_VEL + (MAX_VEL - ENGINE_MAX_VEL) * gearRatio * effectiveAccel;
   let engineVelTarget = (engineRunning && !engineStalled && gear !== 'N') ? motorVelMax * engagement : 0;
 
