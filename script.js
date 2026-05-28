@@ -193,10 +193,18 @@ function animate(timestamp) {
   // Partículas de humo proporcionales a RPM
   updateParticles(dt);
   if (engineRunning && !engineStalled) {
-    const spawnRate = (rpm / RPM_MAX) * 0.08;
+    const spawnRate = (rpm / RPM_MAX) * 0.08; // máx 0.08 partículas/ms ≈ 8 por frame
     const toSpawn = Math.floor(spawnRate * dt);
     if (toSpawn > 0) {
-      spawnSmoke(76, 28, toSpawn); // coordenadas SVG del tubo de escape
+      // Tubo de escape en coordenadas SVG: (76, 28) ≈ esquina trasera inferior
+      // Transformar a coordenadas pantalla: escala ×4, posición del coche
+      const cajaRect = caja.getBoundingClientRect();
+      const rectRect = rectEl.getBoundingClientRect();
+      const escapeLocalX = 76 * 4; // en px dentro del SVG caja
+      const escapeLocalY = 28 * 4;
+      const escapeScreenX = cajaRect.left + escapeLocalX - rectRect.left;
+      const escapeScreenY = cajaRect.top + escapeLocalY - rectRect.top;
+      spawnSmoke(escapeScreenX, escapeScreenY, toSpawn);
     }
   }
 }
@@ -519,7 +527,7 @@ let particlePool = [];
 function initParticlePool() {
   for (let i = 0; i < PARTICLE_POOL_SIZE; i++) {
     const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    circle.setAttribute('fill', '#888');
+    circle.setAttribute('fill', '#999');
     circle.setAttribute('opacity', '0');
     humoSvg.appendChild(circle);
     particles.push(new Particle(circle));
