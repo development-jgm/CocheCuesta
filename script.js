@@ -3,9 +3,10 @@ const triangulo  = document.getElementById('triangulo');
 const valor      = document.getElementById('valor');
 const caja       = document.getElementById('caja');
 const rectEl     = document.querySelector('.cuadrado');
-const btnArduino = document.getElementById('btnArduino');
+const frenoMano  = document.getElementById('frenoMano');
 
-const CAJA_SIZE = 40;
+const CAJA_W = 160;
+const CAJA_H = 80;
 const MAX_VEL    = 0.0008; // velocidad máxima (fracción del ancho / ms)
 const ACCEL_RATE = 0.003;  // ritmo de aceleración (lento, como la gravedad)
 const BRAKE_RATE = 0.05;   // ritmo de frenada (rápido, como un freno de disco)
@@ -13,7 +14,9 @@ const BRAKE_RATE = 0.05;   // ritmo de frenada (rápido, como un freno de disco)
 let posX      = 0.9;
 let vel       = 0;
 let lastTime  = null;
-let brakeValue = 0; // 0-100, recibido del Arduino
+let brakeValue      = 0;    // 0-100, recibido del Arduino
+let handbrake       = true; // freno de mano activo al arrancar
+let arduinoConnected = false;
 
 // ── Pendiente (solo slider) ───────────────────────────────────────────────────
 
@@ -42,11 +45,11 @@ function renderCaja() {
 
   const x  = posX * w;
   const y  = h * (1 - posX * slider.value / 100);
-  const cx = x - Math.sin(theta) * CAJA_SIZE / 2;
-  const cy = y - Math.cos(theta) * CAJA_SIZE / 2;
+  const cx = x - Math.sin(theta) * CAJA_H / 2;
+  const cy = y - Math.cos(theta) * CAJA_H / 2;
 
-  caja.style.left      = `${cx - CAJA_SIZE / 2}px`;
-  caja.style.top       = `${cy - CAJA_SIZE / 2}px`;
+  caja.style.left      = `${cx - CAJA_W / 2}px`;
+  caja.style.top       = `${cy - CAJA_H / 2}px`;
   caja.style.transform = `rotate(${-theta}rad)`;
 }
 
@@ -55,8 +58,9 @@ function animate(timestamp) {
   const dt = Math.min(timestamp - lastTime, 50);
   lastTime = timestamp;
 
-  const theta     = getTheta();
-  const targetVel = MAX_VEL * Math.sin(theta) * Math.sqrt(1 - brakeValue / 100);
+  const theta       = getTheta();
+  const effectiveBrake = handbrake ? 100 : brakeValue;
+  const targetVel   = MAX_VEL * Math.sin(theta) * Math.sqrt(1 - effectiveBrake / 100);
   const rate      = vel > targetVel ? BRAKE_RATE : ACCEL_RATE;
 
   vel  += (targetVel - vel) * Math.min(1, rate * dt);
@@ -81,15 +85,23 @@ function reset() {
 
 requestAnimationFrame(animate);
 
-// ── Web Serial (freno) ────────────────────────────────────────────────────────
+// ── Freno de mano + Web Serial ────────────────────────────────────────────────
 
-btnArduino.addEventListener('click', async () => {
+frenoMano.addEventListener('change', async () => {
+  handbrake = frenoMano.checked;
+  if (!handbrake && !arduinoConnected) {
+    await connectArduino();
+  }
+});
+
+async function connectArduino() {
   try {
-    const port = await navigator.serial.requestPort();
+    const ports = await navigator.serial.getPorts();
+    const port  = ports.length > 0
+      ? ports[0]                          // permiso ya concedido → sin popup
+      : await navigator.serial.requestPort(); // primera vez → popup inevitable
     await port.open({ baudRate: 9600 });
-
-    btnArduino.textContent = 'Arduino conectado';
-    btnArduino.disabled    = true;
+    arduinoConnected = true;
 
     const reader = port.readable.pipeThrough(new TextDecoderStream()).getReader();
     let buffer = '';
@@ -107,7 +119,7 @@ btnArduino.addEventListener('click', async () => {
     }
   } catch (err) {
     console.error(err);
-    btnArduino.textContent = 'Error — reintentar';
-    btnArduino.disabled    = false;
+    handbrake = true;
+    frenoMano.checked = true;
   }
-});
+}

@@ -24,14 +24,13 @@ body {
   width: 200px;
 }
 
-#btnArduino {
-  padding: 6px 14px;
+.freno-mano {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   cursor: pointer;
-}
-
-#btnArduino:disabled {
-  cursor: default;
-  opacity: 0.6;
+  font-weight: bold;
+  user-select: none;
 }
 
 .cuadrado {
@@ -50,11 +49,8 @@ body {
   clip-path: polygon(0% 100%, 100% 100%, 100% 0%);
 }
 
-.caja {
+#caja {
   position: absolute;
-  width: 40px;
-  height: 40px;
-  background-color: #2196F3;
-  border: 2px solid #0d47a1;
   z-index: 1;
+  overflow: visible;
 }
