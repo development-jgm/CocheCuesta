@@ -35,6 +35,8 @@
     </div>
     <div class="triangulo" id="triangulo"></div>
     <svg id="caja" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 40" width="320" height="160">
+      <!-- Partículas de humo (capa inferior) -->
+      <g id="humo"></g>
       <!-- Carrocería (grupo que tiembla con el motor) -->
       <g id="carroceria">
         <path d="M4,26 L4,18 L13,18 L20,7 L50,7 L58,18 L75,18 L75,26 Z" fill="#e74c3c"/>
@@ -72,8 +74,6 @@
         <circle cx="62" cy="31" r="2.5" fill="#777"/>
         <circle cx="62" cy="31" r="1"   fill="#333"/>
       </g>
-      <!-- Partículas de humo (coordenadas SVG diretas) -->
-      <g id="humo"></g>
     </svg>
   </div>
   <script src="script.js"></script>
