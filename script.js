@@ -36,6 +36,8 @@ async function loadConfig() {
     ACCEL_RATE        = cfg.fisica?.tasa_aceleracion                 ?? ACCEL_RATE;
     BRAKE_RATE        = cfg.fisica?.tasa_frenado                     ?? BRAKE_RATE;
     ENGINE_MAX_VEL    = cfg.motor?.velocidad_max_ralenti              ?? ENGINE_MAX_VEL;
+    RPM_IDLE          = cfg.motor?.rpm_ralenti                       ?? RPM_IDLE;
+    RPM_MAX           = cfg.motor?.rpm_max                           ?? RPM_MAX;
     BRAKE_DEADBAND    = cfg.freno?.zona_muerta_pct                   ?? BRAKE_DEADBAND;
     CLUTCH_ENABLE_THR = cfg.embrague?.umbral_activacion_marchas_pct  ?? CLUTCH_ENABLE_THR;
     STALL_THRESHOLD   = cfg.embrague?.umbral_calado                  ?? STALL_THRESHOLD;
@@ -165,6 +167,10 @@ function animate(timestamp) {
 
   renderCaja();
   updateGauge(Math.abs(vel) * SLOPE_M * 3600);
+  const rpm = (engineRunning && !engineStalled)
+    ? RPM_IDLE + (acceleratorValue / 100) * (RPM_MAX - RPM_IDLE)
+    : 0;
+  updateRpmGauge(rpm);
   updateEngineSound(acceleratorValue, engineRunning && !engineStalled);
 }
 
@@ -176,21 +182,25 @@ function reset() {
 
 // ── Velocímetro SVG ───────────────────────────────────────────────────────────
 
-const GCX = 120, GCY = 108, GR = 88;
+const GCX = 120, GCX2 = 360, GCY = 108, GR = 88;
 const G_START = 225, G_SWEEP = 270, G_MAX = 160;
+const RPM_GAUGE_MAX = 8000, RPM_RED_ZONE = 6000;
 
-function gAngle(spd) {
-  return G_START + (Math.min(spd, G_MAX) / G_MAX) * G_SWEEP;
+let RPM_IDLE = 700;
+let RPM_MAX  = 6500;
+
+function gAngle(val, maxVal = G_MAX) {
+  return G_START + (Math.min(Math.max(val, 0), maxVal) / maxVal) * G_SWEEP;
 }
 
-function gPoint(deg, r) {
+function gPoint(deg, r, cx = GCX, cy = GCY) {
   const a = (deg - 90) * Math.PI / 180;
-  return { x: GCX + r * Math.cos(a), y: GCY + r * Math.sin(a) };
+  return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
 }
 
-function gArc(fromDeg, toDeg, r) {
-  const p1    = gPoint(fromDeg, r);
-  const p2    = gPoint(toDeg, r);
+function gArc(fromDeg, toDeg, r, cx = GCX, cy = GCY) {
+  const p1    = gPoint(fromDeg, r, cx, cy);
+  const p2    = gPoint(toDeg,   r, cx, cy);
   const sweep = ((toDeg - fromDeg) + 720) % 360;
   return `M ${p1.x.toFixed(1)},${p1.y.toFixed(1)} A ${r},${r} 0 ${sweep > 180 ? 1 : 0},1 ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
 }
@@ -323,6 +333,103 @@ function initGauge() {
     fill: '#1a0000', 'font-size': 7.5, 'font-family': 'Arial,sans-serif',
     'font-weight': 'bold', 'letter-spacing': 1
   }, 'CALADO'));
+
+  // ── Tacómetro ────────────────────────────────────────────────────────────────
+  buildRpmDial(svg);
+}
+
+function buildRpmDial(svg) {
+  const cx = GCX2, cy = GCY, r = GR;
+
+  svg.appendChild(svgEl('circle', { cx, cy, r: r + 18, fill: '#151515', stroke: '#2e2e2e', 'stroke-width': 2 }));
+  svg.appendChild(svgEl('circle', { cx, cy, r: r + 10, fill: 'url(#bgGrad)' }));
+  svg.appendChild(svgEl('circle', { cx, cy, r: r + 3,  fill: 'none', stroke: '#1a1a1a', 'stroke-width': 4 }));
+
+  svg.appendChild(svgEl('path', {
+    d: gArc(G_START, G_START + G_SWEEP, r - 6, cx, cy),
+    fill: 'none', stroke: '#1c1c1c', 'stroke-width': 14, 'stroke-linecap': 'round'
+  }));
+  svg.appendChild(svgEl('path', {
+    d: gArc(gAngle(RPM_RED_ZONE, RPM_GAUGE_MAX), gAngle(RPM_GAUGE_MAX, RPM_GAUGE_MAX), r - 6, cx, cy),
+    fill: 'none', stroke: '#2a0505', 'stroke-width': 14, 'stroke-linecap': 'round'
+  }));
+  svg.appendChild(svgEl('path', {
+    id: 'rpmArc', d: 'M 0,0', fill: 'none', stroke: '#00cc44', 'stroke-width': 7,
+    'stroke-linecap': 'round', opacity: 0, filter: 'url(#softglow)'
+  }));
+
+  // Ticks menores (cada 500 rpm)
+  for (let v = 500; v < RPM_GAUGE_MAX; v += 1000) {
+    const a  = gAngle(v, RPM_GAUGE_MAX);
+    const p1 = gPoint(a, r - 1,  cx, cy);
+    const p2 = gPoint(a, r - 9,  cx, cy);
+    svg.appendChild(svgEl('line', { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, stroke: '#333', 'stroke-width': 1 }));
+  }
+  // Ticks mayores + etiquetas (cada 1000 rpm, muestra x1000)
+  for (let v = 0; v <= RPM_GAUGE_MAX; v += 1000) {
+    const a  = gAngle(v, RPM_GAUGE_MAX);
+    const p1 = gPoint(a, r - 1,  cx, cy);
+    const p2 = gPoint(a, r - 15, cx, cy);
+    svg.appendChild(svgEl('line', { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, stroke: '#888', 'stroke-width': 2, 'stroke-linecap': 'round' }));
+    const np = gPoint(a, r - 27, cx, cy);
+    svg.appendChild(svgEl('text', {
+      x: np.x, y: np.y, 'text-anchor': 'middle', 'dominant-baseline': 'middle',
+      fill: v >= RPM_RED_ZONE ? '#882222' : '#666', 'font-size': 10, 'font-family': 'Arial,sans-serif'
+    }, (v / 1000).toString()));
+  }
+
+  svg.appendChild(svgEl('text', {
+    x: cx, y: cy + 32, 'text-anchor': 'middle',
+    fill: '#333', 'font-size': 7, 'font-family': 'Arial,sans-serif', 'letter-spacing': 2
+  }, 'x1000 rpm'));
+
+  svg.appendChild(svgEl('line', {
+    id: 'rpmNeedle',
+    x1: cx, y1: cy + 14, x2: cx, y2: cy - (r - 20),
+    stroke: '#ff3c3c', 'stroke-width': 2.5, 'stroke-linecap': 'round',
+    transform: `rotate(${G_START}, ${cx}, ${cy})`,
+    filter: 'url(#glow)'
+  }));
+
+  svg.appendChild(svgEl('circle', { cx, cy, r: 11, fill: '#111', stroke: '#3a3a3a', 'stroke-width': 1.5 }));
+  svg.appendChild(svgEl('circle', { cx, cy, r: 4, fill: '#555' }));
+
+  svg.appendChild(svgEl('rect', { x: cx - 36, y: cy + 40, width: 72, height: 26, rx: 4, fill: '#030303', stroke: '#1c1c1c' }));
+  svg.appendChild(svgEl('text', {
+    id: 'rpmDigital', x: cx, y: cy + 58,
+    'text-anchor': 'middle', 'dominant-baseline': 'middle',
+    fill: '#39ff14', 'font-size': 17, 'font-family': "'Courier New',monospace",
+    'font-weight': 'bold', filter: 'url(#softglow)'
+  }, '0'));
+
+  svg.appendChild(svgEl('rect', { x: cx - 30, y: cy + 72, width: 60, height: 13, rx: 2, fill: '#020202', stroke: '#111' }));
+  svg.appendChild(svgEl('text', {
+    x: cx, y: cy + 79, 'text-anchor': 'middle', 'dominant-baseline': 'middle',
+    fill: '#2a2a2a', 'font-size': 7, 'font-family': "'Courier New',monospace"
+  }, 'MOTOR'));
+}
+
+function updateRpmGauge(rpm) {
+  const angle = gAngle(rpm, RPM_GAUGE_MAX);
+
+  const needle = document.getElementById('rpmNeedle');
+  if (needle) needle.setAttribute('transform', `rotate(${angle}, ${GCX2}, ${GCY})`);
+
+  const arc = document.getElementById('rpmArc');
+  if (arc) {
+    if (rpm < 10) {
+      arc.setAttribute('opacity', 0);
+    } else {
+      arc.setAttribute('opacity', 1);
+      arc.setAttribute('d', gArc(G_START, angle, GR - 6, GCX2, GCY));
+      arc.setAttribute('stroke',
+        rpm < 3000 ? '#00cc44' :
+        rpm < 5500 ? '#ffaa00' : '#ff3333');
+    }
+  }
+
+  const dig = document.getElementById('rpmDigital');
+  if (dig) dig.textContent = Math.round(rpm);
 }
 
 function updateGauge(speedKmh) {

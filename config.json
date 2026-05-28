@@ -9,7 +9,9 @@
     "tasa_frenado": 0.05
   },
   "motor": {
-    "velocidad_max_ralenti": 0.0003
+    "velocidad_max_ralenti": 0.0003,
+    "rpm_ralenti": 700,
+    "rpm_max": 6500
   },
   "freno": {
     "zona_muerta_pct": 97
@@ -22,7 +24,7 @@
   "audio": {
     "frecuencia_ralenti_hz": 65,
     "frecuencia_max_hz": 210,
-    "volumen_ralenti": 0.07,
+    "volumen_ralenti": 0.30,
     "volumen_max": 0.45,
     "inercia_motor_s": 0.18
   }
