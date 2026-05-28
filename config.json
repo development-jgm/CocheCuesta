@@ -24,8 +24,8 @@
   "audio": {
     "frecuencia_ralenti_hz": 47,
     "frecuencia_max_hz": 200,
-    "volumen_ralenti": 0.35,
-    "volumen_max": 0.60,
+    "volumen_ralenti": 1.05,
+    "volumen_max": 1.80,
     "inercia_motor_s": 0.18,
     "filtro_cutoff_min_hz": 130,
     "filtro_cutoff_max_hz": 520

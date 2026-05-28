@@ -756,8 +756,8 @@ function playStallSound() {
 
   // Envolvente rápida: spike de volumen → decay
   const noiseGain = audioCtx.createGain();
-  noiseGain.gain.setValueAtTime(1.0, t);
-  noiseGain.gain.exponentialRampToValueAtTime(0.02, t + 0.15);
+  noiseGain.gain.setValueAtTime(3.0, t);
+  noiseGain.gain.exponentialRampToValueAtTime(0.06, t + 0.15);
 
   noiseSource.connect(noiseLpf);
   noiseLpf.connect(noiseGain);
@@ -772,7 +772,7 @@ function playStallSound() {
   clickOsc.frequency.exponentialRampToValueAtTime(80, t + 0.12);
 
   const clickGain = audioCtx.createGain();
-  clickGain.gain.setValueAtTime(0.6, t + 0.1);
+  clickGain.gain.setValueAtTime(1.8, t + 0.1);
   clickGain.gain.exponentialRampToValueAtTime(0, t + 0.12);
 
   clickOsc.connect(clickGain);
