@@ -172,12 +172,14 @@ function animate(timestamp) {
   const strongBrake = totalBrake > 50; // freno muy fuerte
   // Umbral más bajo si hay freno fuerte (motor se cala antes al soltar embrague con freno)
   const effectiveStallThreshold = strongBrake ? 0.33 : STALL_THRESHOLD;
+  // Tiempo de calado más corto con freno fuerte (150ms vs 600ms normal)
+  const effectiveStallTime = (strongBrake && acceleratorValue <= 0) ? 150 : STALL_TIME;
   const shouldStall = engagement > effectiveStallThreshold && !isAcceleratingEnough &&
                       (!hasEnoughSpeed || (strongBrake && acceleratorValue <= 0));
   if (engineRunning && !engineStalled && gear !== 'N') {
     if (shouldStall) {
       stallTimer += dt;
-      if (stallTimer >= STALL_TIME) {
+      if (stallTimer >= effectiveStallTime) {
         engineStalled = true;
         showStallMessage();
         shakeOnStall();
