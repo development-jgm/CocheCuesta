@@ -286,8 +286,7 @@ async function connectArduino() {
         const val = parseInt(line.trim(), 10);
         if (!isNaN(val)) {
           let v = Math.max(0, Math.min(100, val));
-          if (v >= 95) v = 100; // zona muerta: freno completamente pisado
-          if (v <=  5) v = 0;   // zona muerta: sin freno
+          if (v >= 97) v = 100; // zona muerta solo en el extremo de freno máximo
           brakeValue = v;
         }
       }
