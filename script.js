@@ -168,7 +168,10 @@ function animate(timestamp) {
   if (engineRunning && !engineStalled && gear !== 'N') {
     if (engagement > STALL_THRESHOLD && !isAcceleratingEnough && !hasEnoughSpeed) {
       stallTimer += dt;
-      if (stallTimer >= STALL_TIME) engineStalled = true;
+      if (stallTimer >= STALL_TIME) {
+        engineStalled = true;
+        showStallMessage();
+      }
     } else {
       stallTimer = 0;
     }
@@ -718,8 +721,6 @@ loadConfig().then(() => {
   initParticlePool();
   requestAnimationFrame(animate);
   autoConnectArduino(); // intenta reconectar silenciosamente si hay permiso previo
-  // Testing: mostrar mensaje al cargar (quitar después)
-  setTimeout(() => showStallMessage(), 500);
 });
 
 // ── Freno de mano + Web Serial ────────────────────────────────────────────────
