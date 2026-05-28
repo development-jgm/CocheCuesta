@@ -94,15 +94,14 @@ function animate(timestamp) {
   const physTarget = gravVelTarget + engineVelTarget;
 
   // ── Lógica de calado ──────────────────────────────────────────────────────
-  if (!engineStalled && gear !== 'N' && engagement > 0.5 && physTarget < 0) {
-    // Motor sobrecargado: la cuesta supera la fuerza a ralentí
-    stallTimer += dt;
-    if (stallTimer >= STALL_TIME) {
-      engineStalled     = true;
-      engineVelTarget   = 0;
+  // A ralentí, soltar el embrague más del 65% de recorrido cala el motor
+  if (!engineStalled && gear !== 'N') {
+    if (engagement > 0.65) {
+      stallTimer += dt;
+      if (stallTimer >= STALL_TIME) engineStalled = true;
+    } else {
+      stallTimer = 0; // embrague pisado suficiente: timer se resetea
     }
-  } else {
-    stallTimer = Math.max(0, stallTimer - dt * 2); // se recupera si la carga baja
   }
   // Arrancar: embrague a fondo reinicia el motor
   if (engineStalled && clutchValue >= 97) {
