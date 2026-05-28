@@ -196,12 +196,12 @@ function animate(timestamp) {
     const spawnRate = (rpm / RPM_MAX) * 0.08; // máx 0.08 partículas/ms ≈ 8 por frame
     const toSpawn = Math.floor(spawnRate * dt);
     if (toSpawn > 0) {
-      // Tubo de escape en coordenadas SVG: (3, 28) = parte trasera inferior
+      // Tubo de escape en coordenadas SVG: (3, 31) = parte trasera a nivel del suelo
       // Transformar a coordenadas pantalla: escala ×4, posición del coche
       const cajaRect = caja.getBoundingClientRect();
       const rectRect = rectEl.getBoundingClientRect();
       const escapeLocalX = 3 * 4; // en px dentro del SVG caja
-      const escapeLocalY = 28 * 4;
+      const escapeLocalY = 31 * 4;
       const escapeScreenX = cajaRect.left + escapeLocalX - rectRect.left;
       const escapeScreenY = cajaRect.top + escapeLocalY - rectRect.top;
       spawnSmoke(escapeScreenX, escapeScreenY, toSpawn);
