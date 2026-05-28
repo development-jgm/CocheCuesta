@@ -537,7 +537,8 @@ function spawnSmoke(escapeX, escapeY, count, rpm) {
     p.life = 1500 + Math.random() * 500;
     p.x = escapeX + (Math.random() - 0.5) * 8;
     p.y = escapeY + (Math.random() - 0.5) * 4;
-    p.vx = (Math.random() - 0.5) * 0.08 * accelFactor;
+    // Humo despedido hacia la izquierda (vx negativa = izquierda)
+    p.vx = -(0.1 + Math.random() * 0.15) * (0.4 + accelFactor * 0.6); // ralentí leve, fondo fuerte
     const baseVy = 0.06 + accelFactor * 0.12; // ralentí 0.06, fondo 0.18
     p.vy = -baseVy - Math.random() * (0.05 * accelFactor);
     p.r = 1.5 + Math.random() * 1;
