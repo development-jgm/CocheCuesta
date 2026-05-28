@@ -109,7 +109,9 @@ function applyPendiente(val) {
 
 slider.addEventListener('input', () => {
   applyPendiente(Number(slider.value));
-  reset();
+  // Al cambiar pendiente, solo detiene el movimiento pero mantiene la posición
+  vel = 0;
+  lastTime = null;
 });
 
 // ── Física ────────────────────────────────────────────────────────────────────
