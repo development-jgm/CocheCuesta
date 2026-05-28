@@ -4,15 +4,18 @@ const valor      = document.getElementById('valor');
 const caja       = document.getElementById('caja');
 const rectEl     = document.querySelector('.cuadrado');
 const frenoMano  = document.getElementById('frenoMano');
+const wfEl       = document.getElementById('wf');
+const wrEl       = document.getElementById('wr');
 
 const SLOPE_M    = 30;    // longitud virtual de la cuesta en metros
-const CAJA_W     = 160;
-const CAJA_H     = 80;
+const CAJA_W     = 320;
+const CAJA_H     = 160;
 const MAX_VEL    = 0.0008;
 const ACCEL_RATE = 0.003;
 const BRAKE_RATE = 0.05;
 
 let posX         = 0.9;
+let wheelAngle   = 0; // grados acumulados de rotación de las ruedas
 let vel          = 0;
 let lastTime     = null;
 let brakeValue   = 0;
@@ -74,6 +77,12 @@ function animate(timestamp) {
     vel  = 0;
     lastTime = null;
   }
+
+  // Radio rueda: 9 SVG units × escala (320px / 80 SVG) = 36 px
+  const wheelRpx = 9 * (CAJA_W / 80);
+  wheelAngle -= (vel * rectEl.clientWidth / wheelRpx) * (180 / Math.PI) * dt;
+  wfEl.setAttribute('transform', `rotate(${wheelAngle}, 16, 31)`);
+  wrEl.setAttribute('transform', `rotate(${wheelAngle}, 62, 31)`);
 
   renderCaja();
   updateGauge(vel * SLOPE_M * 3600);
@@ -275,7 +284,12 @@ async function connectArduino() {
       buffer = lines.pop();
       for (const line of lines) {
         const val = parseInt(line.trim(), 10);
-        if (!isNaN(val)) brakeValue = Math.max(0, Math.min(100, val));
+        if (!isNaN(val)) {
+          let v = Math.max(0, Math.min(100, val));
+          if (v >= 95) v = 100; // zona muerta: freno completamente pisado
+          if (v <=  5) v = 0;   // zona muerta: sin freno
+          brakeValue = v;
+        }
       }
     }
   } catch (err) {
