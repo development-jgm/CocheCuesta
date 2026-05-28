@@ -169,7 +169,9 @@ function animate(timestamp) {
   const isAcceleratingEnough = accelFactor >= minAccelForMaintain;
   const hasEnoughSpeed = vel < 0 && Math.abs(vel) > ENGINE_MAX_VEL * 0.5; // inercia de bajada
   const strongBrake = effectiveBrake > 50; // freno muy fuerte
-  const shouldStall = engagement > STALL_THRESHOLD && !isAcceleratingEnough &&
+  // Umbral más bajo si hay freno fuerte (motor se cala antes al soltar embrague con freno)
+  const effectiveStallThreshold = strongBrake ? 0.33 : STALL_THRESHOLD;
+  const shouldStall = engagement > effectiveStallThreshold && !isAcceleratingEnough &&
                       (!hasEnoughSpeed || (strongBrake && acceleratorValue <= 0));
   if (engineRunning && !engineStalled && gear !== 'N') {
     if (shouldStall) {
