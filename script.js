@@ -406,62 +406,76 @@ function updateEngineSound(accelPct, running) {
 }
 
 loadConfig().then(() => {
-  posX = INITIAL_POSX; // aplicar posición inicial del config
+  posX = INITIAL_POSX;
   initGauge();
   requestAnimationFrame(animate);
+  autoConnectArduino(); // intenta reconectar silenciosamente si hay permiso previo
 });
 
 // ── Freno de mano + Web Serial ────────────────────────────────────────────────
 
+// AudioContext requiere gesto del usuario — cualquier click es suficiente
+document.addEventListener('click', () => initAudio(), { once: true });
+
 frenoMano.addEventListener('change', async () => {
   handbrake = frenoMano.checked;
-  initAudio(); // primer gesto del usuario → AudioContext permitido
   if (!handbrake && !arduinoConnected) {
     await connectArduino();
   }
 });
 
+async function openSerialPort(port) {
+  await port.open({ baudRate: 9600 });
+  arduinoConnected = true;
+  const reader = port.readable.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = '';
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += value;
+    const lines = buffer.split('\n');
+    buffer = lines.pop();
+    for (const line of lines) {
+      const parts = line.trim().split(',');
+      if (parts.length < 2) continue;
+      const rawBrake  = parseInt(parts[0], 10);
+      const rawClutch = parseInt(parts[1], 10);
+      if (!isNaN(rawBrake)) {
+        let v = Math.max(0, Math.min(100, rawBrake));
+        if (v >= BRAKE_DEADBAND) v = 100;
+        brakeValue = v;
+      }
+      if (!isNaN(rawClutch)) {
+        clutchValue = Math.max(0, Math.min(100, rawClutch));
+        updateGearSelector();
+      }
+      const rawAccel = parseInt(parts[2], 10);
+      if (!isNaN(rawAccel)) {
+        acceleratorValue = Math.max(0, Math.min(100, rawAccel));
+      }
+    }
+  }
+}
+
+// Intenta conectar al arrancar si ya hay permiso concedido (sin popup)
+async function autoConnectArduino() {
+  if (!navigator.serial) return;
+  try {
+    const ports = await navigator.serial.getPorts();
+    if (ports.length > 0) await openSerialPort(ports[0]);
+  } catch { /* sin permiso previo — se conectará al soltar el freno */ }
+}
+
 async function connectArduino() {
+  if (arduinoConnected) return;
   try {
     const ports = await navigator.serial.getPorts();
     const port  = ports.length > 0
       ? ports[0]
       : await navigator.serial.requestPort();
-    await port.open({ baudRate: 9600 });
-    arduinoConnected = true;
-
-    const reader = port.readable.pipeThrough(new TextDecoderStream()).getReader();
-    let buffer = '';
-
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += value;
-      const lines = buffer.split('\n');
-      buffer = lines.pop();
-      for (const line of lines) {
-        const parts = line.trim().split(',');
-        if (parts.length < 2) continue;
-        const rawBrake  = parseInt(parts[0], 10);
-        const rawClutch = parseInt(parts[1], 10);
-        if (!isNaN(rawBrake)) {
-          let v = Math.max(0, Math.min(100, rawBrake));
-          if (v >= BRAKE_DEADBAND) v = 100;
-          brakeValue = v;
-        }
-        if (!isNaN(rawClutch)) {
-          clutchValue = Math.max(0, Math.min(100, rawClutch));
-          updateGearSelector();
-        }
-        const rawAccel = parseInt(parts[2], 10);
-        if (!isNaN(rawAccel)) {
-          acceleratorValue = Math.max(0, Math.min(100, rawAccel));
-        }
-      }
-    }
+    await openSerialPort(port);
   } catch (err) {
     console.error(err);
-    // Solo reactivar el freno si el usuario canceló explícitamente el selector de puerto
     if (err.name === 'NotFoundError' || err.name === 'AbortError') {
       handbrake = true;
       frenoMano.checked = true;
