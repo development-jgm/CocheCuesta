@@ -728,7 +728,14 @@ function initAudio() {
 }
 
 function playStallSound() {
-  if (!audioCtx) return;
+  if (!audioCtx) {
+    console.warn('AudioContext no inicializado');
+    return;
+  }
+  // Asegurar que el contexto de audio está activo
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
   const t = audioCtx.currentTime;
 
   // Crear nodo de ruido blanco para el "crash"
