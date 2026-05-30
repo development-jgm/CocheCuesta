@@ -9,15 +9,16 @@
 <body>
   <div class="controles">
     <button id="btnArduino" style="padding: 8px 12px; cursor: pointer; background: #ff9800; color: white; border: none; border-radius: 4px; font-weight: bold;">Conectar Arduino</button>
+    <div class="motor-electrico-container">
+      <span class="motor-icon" title="Motor térmico">🔥</span>
+      <input type="checkbox" id="motorElectrico" class="ios-toggle" checked>
+      <span class="motor-icon" title="Motor eléctrico">⚡</span>
+    </div>
     <label for="pendiente">Pendiente</label>
     <input type="range" id="pendiente" min="0" max="100" value="0">
     <span id="valor">0%</span>
     <input type="checkbox" id="arrancar" style="display:none">
     <input type="checkbox" id="frenoMano" checked style="display:none">
-    <label class="motor-electrico">
-      <input type="checkbox" id="motorElectrico">
-      Motor eléctrico
-    </label>
   </div>
   <div class="cuadrado">
     <div id="stall-message">¡SE TE HA CALADO!</div>

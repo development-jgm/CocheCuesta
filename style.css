@@ -15,7 +15,7 @@ body {
   margin: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
 }
 
 #fondo-inferior {
@@ -27,9 +27,11 @@ body {
 .controles {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 12px;
   margin-top: 16px;
   margin-bottom: 16px;
+  padding-left: 12px;
 }
 
 .controles input[type="range"] {
@@ -59,14 +61,55 @@ body {
   user-select: none;
 }
 
-.motor-electrico {
+.motor-electrico-container {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.motor-icon {
+  font-size: 16px;
+  opacity: 0.6;
+  transition: opacity 0.3s ease, color 0.3s ease;
+}
+
+.ios-toggle {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 44px;
+  height: 26px;
+  background: #ccc;
+  border-radius: 13px;
+  border: none;
   cursor: pointer;
-  font-weight: bold;
-  user-select: none;
-  color: #1565c0;
+  position: relative;
+  transition: background 0.3s ease;
+  outline: none;
+}
+
+.ios-toggle::before {
+  content: '';
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  background: white;
+  border-radius: 11px;
+  top: 2px;
+  left: 2px;
+  transition: left 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.ios-toggle:checked {
+  background: #1565c0;
+}
+
+.ios-toggle:checked::before {
+  left: 20px;
+}
+
+.ios-toggle:active {
+  opacity: 0.8;
 }
 
 .gear-selector {

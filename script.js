@@ -83,7 +83,7 @@ let handbrake        = true;
 let arduinoConnected = false;
 let currentPort      = null;
 let portOpening      = false;
-let electricMode     = false;
+let electricMode     = true;
 const ACCEL_DEADBAND = 5; // ignora valores menores al 5% (ruido del potenciómetro)
 
 // ── Ciudad ────────────────────────────────────────────────────────────────────
@@ -822,6 +822,7 @@ function initGauge() {
     updateGearHighlight();
     updateHandbrakeLight(handbrake);
     updateLeverAnim();
+    updateMotorIcon();
   });
 }
 
@@ -1683,8 +1684,25 @@ function applyKeyPosition(pos) {
 }
 
 
+function updateMotorIcon() {
+  const container = document.querySelector('.motor-electrico-container');
+  if (container) {
+    const motorIcon = container.querySelector('.motor-icon:last-of-type');
+    if (motorIcon) {
+      if (electricMode) {
+        motorIcon.style.opacity = '1';
+        motorIcon.style.color = '#1565c0';
+      } else {
+        motorIcon.style.opacity = '0.6';
+        motorIcon.style.color = '';
+      }
+    }
+  }
+}
+
 document.getElementById('motorElectrico').addEventListener('change', function() {
   electricMode = this.checked;
+  updateMotorIcon();
 
   // Mostrar/ocultar tubo de escape
   const escapeRects = document.querySelectorAll('#caja rect[fill="#333"], #caja rect[fill="#222"]');
