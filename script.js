@@ -164,7 +164,12 @@ function animate(timestamp) {
   const isDescending = vel < -ENGINE_MAX_VEL * 0.1;
   const engagementBoost = isDescending ? engagement * (1 - accelFactor) * 0.5 : 0;
   const effectiveAccel = accelFactor + engagementBoost;
-  const motorVelMax   = ENGINE_MAX_VEL + (MAX_VEL - ENGINE_MAX_VEL) * gearRatio * effectiveAccel;
+  // Motor eléctrico: rango completo de velocidad sin limitación de marchas
+  const effectiveGearRatio = electricMode ? 1.0 : gearRatio;
+  const electricMaxVel = MAX_VEL * 2.5; // eléctrico llega mucho más rápido
+  const motorVelMax   = electricMode
+    ? electricMaxVel * accelFactor
+    : ENGINE_MAX_VEL + (MAX_VEL - ENGINE_MAX_VEL) * effectiveGearRatio * effectiveAccel;
   // Motor eléctrico: sin acelerador no hay fuerza (no hay ralentí)
   const electricNoForce = electricMode && accelFactor <= 0;
   let engineVelTarget = (engineRunning && !engineStalled && gear !== 'N' && !electricNoForce) ? motorVelMax * engagement : 0;
@@ -936,6 +941,34 @@ loadConfig().then(() => {
   initParticlePool();
   requestAnimationFrame(animate);
   autoConnectArduino(); // intenta reconectar silenciosamente si hay permiso previo
+});
+
+// ── Arrastre del coche con el ratón ───────────────────────────────────────────
+let dragging = false;
+
+caja.style.cursor = 'grab';
+
+caja.addEventListener('mousedown', (e) => {
+  dragging = true;
+  vel = 0;
+  lastTime = null;
+  caja.style.cursor = 'grabbing';
+  e.preventDefault();
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!dragging) return;
+  const rect = rectEl.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  posX = Math.max(0, Math.min(1, mouseX / rect.width));
+});
+
+document.addEventListener('mouseup', () => {
+  if (!dragging) return;
+  dragging = false;
+  caja.style.cursor = 'grab';
+  vel = 0;
+  lastTime = null;
 });
 
 // ── Freno de mano + Web Serial ────────────────────────────────────────────────
