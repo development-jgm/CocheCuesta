@@ -1685,18 +1685,13 @@ function applyKeyPosition(pos) {
 
 
 function updateMotorIcon() {
-  const container = document.querySelector('.motor-electrico-container');
-  if (container) {
-    const motorIcon = container.querySelector('.motor-icon:last-of-type');
-    if (motorIcon) {
-      if (electricMode) {
-        motorIcon.style.opacity = '1';
-        motorIcon.style.color = '#1565c0';
-      } else {
-        motorIcon.style.opacity = '0.6';
-        motorIcon.style.color = '';
-      }
-    }
+  const motorIcon = document.getElementById('motor-electric-icon');
+  const path = motorIcon?.querySelector('path');
+  if (path) {
+    const color = electricMode ? '#1565c0' : '#ccc';
+    path.setAttribute('fill', color);
+    path.setAttribute('stroke', color);
+    motorIcon.style.opacity = electricMode ? '1' : '0.6';
   }
 }
 
