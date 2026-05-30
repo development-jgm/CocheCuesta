@@ -861,19 +861,24 @@ frenoMano.addEventListener('change', async () => {
 });
 
 async function openSerialPort(port) {
-  await port.open({ baudRate: 9600 });
-  arduinoConnected = true;
-  const reader = port.readable.pipeThrough(new TextDecoderStream()).getReader();
-  let buffer = '';
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += value;
-    const lines = buffer.split('\n');
-    buffer = lines.pop();
-    for (const line of lines) {
-      const parts = line.trim().split(',');
-      if (parts.length < 2) continue;
+  try {
+    await port.open({ baudRate: 9600 });
+    arduinoConnected = true;
+    console.log('✓ Puerto serial abierto a 9600 baud');
+    const reader = port.readable.pipeThrough(new TextDecoderStream()).getReader();
+    let buffer = '';
+    let dataCount = 0;
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += value;
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        const parts = line.trim().split(',');
+        if (parts.length < 2) continue;
+        dataCount++;
+        if (dataCount === 1) console.log('✓ Recibidos datos del Arduino:', line);
       const rawBrake  = parseInt(parts[0], 10);
       const rawClutch = parseInt(parts[1], 10);
       if (!isNaN(rawBrake)) {
@@ -895,11 +900,23 @@ async function openSerialPort(port) {
 
 // Intenta conectar al arrancar si ya hay permiso concedido (sin popup)
 async function autoConnectArduino() {
-  if (!navigator.serial) return;
+  console.log('Intentando auto-conectar al Arduino...');
+  if (!navigator.serial) {
+    console.log('⚠ Web Serial API no disponible en este navegador');
+    return;
+  }
   try {
     const ports = await navigator.serial.getPorts();
-    if (ports.length > 0) await openSerialPort(ports[0]);
-  } catch { /* sin permiso previo — se conectará al soltar el freno */ }
+    console.log(`Puertos disponibles: ${ports.length}`);
+    if (ports.length > 0) {
+      console.log('Abriendo primer puerto...');
+      await openSerialPort(ports[0]);
+    } else {
+      console.log('⚠ Sin puertos serial previos permitidos. Necesitarás seleccionar uno manualmente.');
+    }
+  } catch (e) {
+    console.log('⚠ Error auto-conectando:', e.message);
+  }
 }
 
 async function connectArduino() {
