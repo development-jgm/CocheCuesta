@@ -923,6 +923,29 @@ async function autoConnectArduino() {
   }
 }
 
+// Conectar manualmente (requiere click del usuario)
+async function connectArduinoManual() {
+  if (!navigator.serial) {
+    alert('Web Serial API no disponible en este navegador. Usa Chrome, Edge o Brave.');
+    return;
+  }
+  try {
+    const port = await navigator.serial.requestPort();
+    console.log('Puerto seleccionado por el usuario');
+    await openSerialPort(port);
+    document.getElementById('btnArduino').textContent = '✓ Arduino conectado';
+    document.getElementById('btnArduino').style.background = '#4caf50';
+  } catch (e) {
+    console.log('Usuario canceló o error:', e.message);
+  }
+}
+
+// Botón para conectar
+const btnArduino = document.getElementById('btnArduino');
+if (btnArduino) {
+  btnArduino.addEventListener('click', connectArduinoManual);
+}
+
 async function connectArduino() {
   if (arduinoConnected) return;
   try {
