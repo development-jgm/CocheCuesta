@@ -869,36 +869,53 @@ async function openSerialPort(port) {
     let buffer = '';
     let dataCount = 0;
     while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += value;
-      const lines = buffer.split('\n');
-      buffer = lines.pop();
-      for (const line of lines) {
-        const parts = line.trim().split(',');
-        if (parts.length < 2) continue;
-        dataCount++;
-        if (dataCount === 1) console.log('✓ Recibidos datos del Arduino:', line);
-        const rawBrake  = parseInt(parts[0], 10);
-        const rawClutch = parseInt(parts[1], 10);
-        if (!isNaN(rawBrake)) {
-          let v = Math.max(0, Math.min(100, rawBrake));
-          if (v >= BRAKE_DEADBAND) v = 100;
-          brakeValue = v;
+      try {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += value;
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          const parts = trimmed.split(',');
+          // Necesita exactamente 3 valores
+          if (parts.length !== 3) {
+            console.warn('Línea incompleta ignorada:', trimmed);
+            continue;
+          }
+          dataCount++;
+          if (dataCount === 1) console.log('✓ Recibidos datos del Arduino:', trimmed);
+
+          const rawBrake  = parseInt(parts[0], 10);
+          const rawClutch = parseInt(parts[1], 10);
+          const rawAccel  = parseInt(parts[2], 10);
+
+          if (!isNaN(rawBrake)) {
+            let v = Math.max(0, Math.min(100, rawBrake));
+            if (v >= BRAKE_DEADBAND) v = 100;
+            brakeValue = v;
+          }
+          if (!isNaN(rawClutch)) {
+            clutchValue = Math.max(0, Math.min(100, rawClutch));
+            updateGearSelector();
+          }
+          if (!isNaN(rawAccel)) {
+            acceleratorValue = Math.max(0, Math.min(100, rawAccel));
+          }
         }
-        if (!isNaN(rawClutch)) {
-          clutchValue = Math.max(0, Math.min(100, rawClutch));
-          updateGearSelector();
-        }
-        const rawAccel = parseInt(parts[2], 10);
-        if (!isNaN(rawAccel)) {
-          acceleratorValue = Math.max(0, Math.min(100, rawAccel));
-        }
+      } catch (readError) {
+        console.error('Error leyendo del puerto:', readError.message);
+        break;
       }
     }
   } catch (e) {
-    console.error('Error al leer puerto serial:', e);
+    console.error('Error al abrir puerto serial:', e.message);
+  } finally {
     arduinoConnected = false;
+    console.log('Conexión serial cerrada');
+    // Intentar reconectar en 2 segundos
+    setTimeout(autoConnectArduino, 2000);
   }
 }
 
