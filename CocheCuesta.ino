@@ -30,9 +30,10 @@ void loop() {
 
   idx = (idx + 1) % N;
 
-  int brake  = constrain(map(sum_brake  / N, 0, 1023, 0, 100), 0, 100);
-  int clutch = constrain(map(sum_clutch / N, 0, 1023, 0, 100), 0, 100);
-  int accel  = constrain(map(sum_accel  / N, 0, 1023, 0, 100), 0, 100);
+  // Mapea el rango físico disponible (100-600) a 0-100
+  int brake  = constrain(map(sum_brake  / N, 100, 600, 0, 100), 0, 100);
+  int clutch = constrain(map(sum_clutch / N, 100, 600, 0, 100), 0, 100);
+  int accel  = constrain(map(sum_accel  / N, 100, 600, 0, 100), 0, 100);
 
   Serial.print(brake);
   Serial.print(",");

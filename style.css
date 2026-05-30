@@ -120,11 +120,7 @@ body {
 }
 
 #pedals-gauge {
-  position: absolute;
-  top: 15px;
-  left: 495px;
-  z-index: 10;
-  overflow: hidden;
+  display: block;
 }
 
 #caja {

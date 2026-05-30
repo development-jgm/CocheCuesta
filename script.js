@@ -81,6 +81,8 @@ let engineStalled    = false;
 let stallTimer       = 0;
 let handbrake        = true;
 let arduinoConnected = false;
+let currentPort      = null;
+let portOpening      = false;
 
 const gearInputs = document.querySelectorAll('input[name="marcha"]');
 
@@ -866,10 +868,23 @@ frenoMano.addEventListener('change', async () => {
 });
 
 async function openSerialPort(port) {
+  // Evita intentos simultáneos
+  if (portOpening || arduinoConnected) {
+    console.log('⚠ Intento de apertura en curso o ya conectado');
+    return;
+  }
+  portOpening = true;
+  currentPort = port;
+
   try {
-    await port.open({ baudRate: 9600 });
+    // Abre solo si aún no está abierto
+    if (!port.readable) {
+      await port.open({ baudRate: 9600 });
+    }
     arduinoConnected = true;
+    portOpening = false;
     console.log('✓ Puerto serial abierto a 9600 baud');
+
     const reader = port.readable.pipeThrough(new TextDecoderStream()).getReader();
     let buffer = '';
     let dataCount = 0;
@@ -881,9 +896,9 @@ async function openSerialPort(port) {
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
         for (const line of lines) {
-          const trimmed = line.trim();
+          const trimmed = line.trim().replace(/\r/g, '');
           if (!trimmed) continue;
-          const parts = trimmed.split(',');
+          const parts = trimmed.split(',').map(p => p.trim());
           // Necesita exactamente 3 valores
           if (parts.length !== 3) {
             console.warn('Línea incompleta ignorada:', trimmed);
@@ -918,16 +933,26 @@ async function openSerialPort(port) {
     }
   } catch (e) {
     console.error('Error al abrir puerto serial:', e.message);
+    portOpening = false;
   } finally {
+    try {
+      if (currentPort && currentPort.readable) {
+        await currentPort.close();
+      }
+    } catch {}
     arduinoConnected = false;
+    portOpening = false;
     console.log('Conexión serial cerrada');
-    // Intentar reconectar en 2 segundos
-    setTimeout(autoConnectArduino, 2000);
+    // Intentar reconectar en 3 segundos
+    setTimeout(autoConnectArduino, 3000);
   }
 }
 
 // Intenta conectar al arrancar si ya hay permiso concedido (sin popup)
 async function autoConnectArduino() {
+  if (portOpening || arduinoConnected) {
+    return;
+  }
   console.log('Intentando auto-conectar al Arduino...');
   if (!navigator.serial) {
     console.log('⚠ Web Serial API no disponible en este navegador');
@@ -949,6 +974,10 @@ async function autoConnectArduino() {
 
 // Conectar manualmente (requiere click del usuario)
 async function connectArduinoManual() {
+  if (portOpening || arduinoConnected) {
+    alert('Conexión ya en curso o ya conectado');
+    return;
+  }
   if (!navigator.serial) {
     alert('Web Serial API no disponible en este navegador. Usa Chrome, Edge o Brave.');
     return;
@@ -971,7 +1000,7 @@ if (btnArduino) {
 }
 
 async function connectArduino() {
-  if (arduinoConnected) return;
+  if (arduinoConnected || portOpening) return;
   try {
     const ports = await navigator.serial.getPorts();
     const port  = ports.length > 0
