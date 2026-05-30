@@ -887,20 +887,22 @@ async function openSerialPort(port) {
           dataCount++;
           if (dataCount === 1) console.log('✓ Recibidos datos del Arduino:', trimmed);
 
-          const rawBrake  = parseInt(parts[0], 10);
-          const rawClutch = parseInt(parts[1], 10);
-          const rawAccel  = parseInt(parts[2], 10);
+          // Parsear valores, usar 0 si están vacíos
+          const rawBrake  = parts[0] ? parseInt(parts[0], 10) : 0;
+          const rawClutch = parts[1] ? parseInt(parts[1], 10) : 0;
+          const rawAccel  = parts[2] ? parseInt(parts[2], 10) : 0;
 
-          if (!isNaN(rawBrake)) {
+          // Actualizar valores (ignorar NaN)
+          if (!isNaN(rawBrake) && rawBrake >= 0) {
             let v = Math.max(0, Math.min(100, rawBrake));
             if (v >= BRAKE_DEADBAND) v = 100;
             brakeValue = v;
           }
-          if (!isNaN(rawClutch)) {
+          if (!isNaN(rawClutch) && rawClutch >= 0) {
             clutchValue = Math.max(0, Math.min(100, rawClutch));
             updateGearSelector();
           }
-          if (!isNaN(rawAccel)) {
+          if (!isNaN(rawAccel) && rawAccel >= 0) {
             acceleratorValue = Math.max(0, Math.min(100, rawAccel));
           }
         }
