@@ -83,6 +83,12 @@ let handbrake        = true;
 let arduinoConnected = false;
 let currentPort      = null;
 let portOpening      = false;
+let electricMode     = false;
+const ACCEL_DEADBAND = 5; // ignora valores menores al 5% (ruido del potenciómetro)
+
+// Audio eléctrico
+let electricOsc      = null;
+let electricGain     = null;
 
 const gearInputs = document.querySelectorAll('input[name="marcha"]');
 
@@ -150,16 +156,18 @@ function animate(timestamp) {
   const gravVelTarget = -MAX_VEL * Math.sin(theta);
 
   // Motor: cuesta arriba proporcional al embrague soltado y acelerador
-  const engagement    = gear !== 'N' ? Math.max(0, 1 - clutchValue / 100) : 0;
+  // En modo eléctrico el embrague no existe: engagement siempre 1 si hay marcha
+  const engagement    = gear !== 'N' ? (electricMode ? 1 : Math.max(0, 1 - clutchValue / 100)) : 0;
   const gearRatio     = GEAR_RATIOS[gear] || 0;
-  const accelDeadband = 5; // ignora valores menores al 5% (ruido del potenciómetro)
-  const accelFactor   = acceleratorValue > accelDeadband ? acceleratorValue / 100 : 0;
+  const accelFactor   = acceleratorValue > ACCEL_DEADBAND ? acceleratorValue / 100 : 0;
   // Boost de engagement solo si estamos bajando (necesitamos frenar la caída)
   const isDescending = vel < -ENGINE_MAX_VEL * 0.1;
   const engagementBoost = isDescending ? engagement * (1 - accelFactor) * 0.5 : 0;
   const effectiveAccel = accelFactor + engagementBoost;
   const motorVelMax   = ENGINE_MAX_VEL + (MAX_VEL - ENGINE_MAX_VEL) * gearRatio * effectiveAccel;
-  let engineVelTarget = (engineRunning && !engineStalled && gear !== 'N') ? motorVelMax * engagement : 0;
+  // Motor eléctrico: sin acelerador no hay fuerza (no hay ralentí)
+  const electricNoForce = electricMode && accelFactor <= 0;
+  let engineVelTarget = (engineRunning && !engineStalled && gear !== 'N' && !electricNoForce) ? motorVelMax * engagement : 0;
 
   // Target combinado, luego frenado
   const physTarget = gravVelTarget + engineVelTarget;
@@ -179,7 +187,7 @@ function animate(timestamp) {
   const effectiveStallTime = (strongBrake && acceleratorValue <= 0) ? 150 : STALL_TIME;
   const shouldStall = engagement > effectiveStallThreshold && !isAcceleratingEnough &&
                       (!hasEnoughSpeed || (strongBrake && acceleratorValue <= 0));
-  if (engineRunning && !engineStalled && gear !== 'N') {
+  if (engineRunning && !engineStalled && gear !== 'N' && !electricMode) {
     if (shouldStall) {
       stallTimer += dt;
       if (stallTimer >= effectiveStallTime) {
@@ -216,10 +224,13 @@ function animate(timestamp) {
   wfEl.setAttribute('transform', `rotate(${wheelAngle}, 16, 31)`);
   wrEl.setAttribute('transform', `rotate(${wheelAngle}, 62, 31)`);
 
-  // Temblor de carrocería proporcional a las RPM (ruedas no se mueven)
-  if (engineRunning && !engineStalled) {
-    const rpmNorm = RPM_IDLE / RPM_MAX + (acceleratorValue / 100) * (1 - RPM_IDLE / RPM_MAX);
-    const amp = 0.15 + rpmNorm * 0.55; // 0.15–0.70 SVG units → ~0.6–2.8 px a escala ×4
+  // Temblor de carrocería: combustión siempre tiembla en ralentí, eléctrico solo al acelerar
+  const isRunningOk = engineRunning && !engineStalled;
+  if (isRunningOk && (!electricMode || acceleratorValue > ACCEL_DEADBAND)) {
+    const rpmNorm = electricMode
+      ? acceleratorValue / 100
+      : RPM_IDLE / RPM_MAX + (acceleratorValue / 100) * (1 - RPM_IDLE / RPM_MAX);
+    const amp = 0.15 + rpmNorm * 0.55;
     const dx  = amp * 0.4  * Math.sin(timestamp * 0.071);
     const dy  = amp * (Math.sin(timestamp * 0.047) + 0.35 * Math.sin(timestamp * 0.131));
     carroceriaEl.setAttribute('transform', `translate(${dx.toFixed(3)},${dy.toFixed(3)})`);
@@ -228,20 +239,26 @@ function animate(timestamp) {
   }
 
   renderCaja();
-  // Velocímetro solo muestra velocidad si: motor conectado, no calado, y moviéndose hacia adelante
   const movingForward = vel > 0;
   const displaySpeed = (gear !== 'N' && !engineStalled && movingForward) ? vel * SLOPE_M * 3600 : 0;
   updateGauge(displaySpeed);
-  const rpm = (engineRunning && !engineStalled)
-    ? RPM_IDLE + (acceleratorValue / 100) * (RPM_MAX - RPM_IDLE)
+  // RPM: eléctrico proporcional al acelerador (sin ralentí), combustión con ralentí
+  const rpm = isRunningOk
+    ? (electricMode
+        ? (acceleratorValue > ACCEL_DEADBAND ? (acceleratorValue / 100) * RPM_MAX : 0)
+        : RPM_IDLE + (acceleratorValue / 100) * (RPM_MAX - RPM_IDLE))
     : 0;
   updateRpmGauge(rpm);
   updatePedalsGauge();
-  updateEngineSound(acceleratorValue, engineRunning && !engineStalled);
+  if (electricMode) {
+    updateElectricSound(acceleratorValue, engineRunning);
+  } else {
+    updateEngineSound(acceleratorValue, engineRunning && !engineStalled);
+  }
 
-  // Partículas de humo proporcionales a RPM (coordenadas SVG diretas)
+  // Partículas de humo (solo motor de combustión)
   updateParticles(dt);
-  if (engineRunning && !engineStalled) {
+  if (!electricMode && engineRunning && !engineStalled) {
     const spawnRate = 0.06 + (rpm / RPM_MAX) * 0.14; // leve en ralentí, aumenta con acelerador
     const toSpawn = Math.round(spawnRate * dt); // usar round en lugar de floor
     if (toSpawn > 0) {
@@ -803,6 +820,67 @@ function playStallSound() {
   clickOsc.stop(t + 0.12);
 }
 
+function initElectricAudio() {
+  if (!audioCtx) return;
+  if (electricOsc) return;
+
+  electricOsc = audioCtx.createOscillator();
+  electricOsc.type = 'sine';
+  electricOsc.frequency.value = 200;
+
+  // Segundo oscilador para armónico
+  const electricOsc2 = audioCtx.createOscillator();
+  electricOsc2.type = 'sine';
+  electricOsc2.frequency.value = 400;
+
+  const g1 = audioCtx.createGain(); g1.gain.value = 0.6;
+  const g2 = audioCtx.createGain(); g2.gain.value = 0.3;
+
+  // Filtro paso alto para el zumbido eléctrico
+  const hpf = audioCtx.createBiquadFilter();
+  hpf.type = 'highpass';
+  hpf.frequency.value = 150;
+  hpf.Q.value = 2;
+
+  electricGain = audioCtx.createGain();
+  electricGain.gain.value = 0;
+
+  electricOsc.connect(g1);
+  electricOsc2.connect(g2);
+  g1.connect(hpf);
+  g2.connect(hpf);
+  hpf.connect(electricGain);
+  electricGain.connect(audioCtx.destination);
+
+  electricOsc.start();
+  electricOsc2.start();
+
+  // Guarda referencia al segundo oscilador en el primero
+  electricOsc._osc2 = electricOsc2;
+}
+
+function updateElectricSound(accelPct, running) {
+  if (!audioCtx) return;
+  if (!electricOsc) initElectricAudio();
+  if (!electricOsc) return;
+
+  const t = audioCtx.currentTime;
+
+  if (!running) {
+    electricGain.gain.setTargetAtTime(0, t, 0.1);
+    return;
+  }
+
+  // Frecuencia sube con el acelerador (200 Hz en reposo → 1200 Hz a fondo)
+  const freq = 200 + (accelPct / 100) * 1000;
+  electricOsc.frequency.setTargetAtTime(freq, t, 0.05);
+  electricOsc._osc2.frequency.setTargetAtTime(freq * 2, t, 0.05);
+
+  // Sin ralentí: silencio total si no hay acelerador
+  const vol = accelPct > ACCEL_DEADBAND ? (accelPct / 100) * 0.3 : 0;
+  electricGain.gain.setTargetAtTime(vol, t, 0.05);
+}
+
 function updateEngineSound(accelPct, running) {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;
@@ -866,9 +944,37 @@ const arrancarEl = document.getElementById('arrancar');
 arrancarEl.addEventListener('change', () => {
   engineRunning = arrancarEl.checked;
   if (engineRunning) {
-    initAudio();       // gesto del usuario → AudioContext permitido
-    engineStalled = false; // arranque limpio (también re-arranca tras calado)
+    initAudio();
+    if (electricMode) initElectricAudio();
+    engineStalled = false;
     stallTimer    = 0;
+  }
+});
+
+document.getElementById('motorElectrico').addEventListener('change', function() {
+  electricMode = this.checked;
+
+  // Mostrar/ocultar tubo de escape
+  const escapeRects = document.querySelectorAll('#caja rect[fill="#333"], #caja rect[fill="#222"]');
+  escapeRects.forEach(r => r.style.display = electricMode ? 'none' : '');
+
+  // Mostrar/ocultar selector de marchas y barra de embrague
+  document.querySelector('.gear-selector').style.display = electricMode ? 'none' : '';
+  document.getElementById('clutch-bar').style.display = electricMode ? 'none' : '';
+
+  if (electricMode) {
+    // Fijar marcha 1 automáticamente (ratio constante)
+    gear = '1';
+    document.querySelector('input[name="marcha"][value="1"]').checked = true;
+    if (audioCtx) engineGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+    if (engineRunning) initElectricAudio();
+    engineStalled = false;
+    stallTimer = 0;
+  } else {
+    // Volver a neutro
+    gear = 'N';
+    document.querySelector('input[name="marcha"][value="N"]').checked = true;
+    if (electricGain) electricGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
   }
 });
 

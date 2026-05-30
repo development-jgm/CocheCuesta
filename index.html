@@ -20,6 +20,10 @@
       <input type="checkbox" id="frenoMano" checked>
       Freno de mano
     </label>
+    <label class="motor-electrico">
+      <input type="checkbox" id="motorElectrico">
+      Motor eléctrico
+    </label>
     <div class="gear-selector">
       <span class="gear-label">Marcha:</span>
       <label class="gear-btn"><input type="radio" name="marcha" value="N" checked disabled><span>N</span></label>
@@ -44,9 +48,11 @@
           </pattern>
         </defs>
         <!-- Embrague (izquierda) -->
-        <rect x="5" y="10" width="24" height="200" fill="none" stroke="#666" stroke-width="1.5" rx="2"/>
-        <rect id="clutch-fill" x="5" y="10" width="24" height="200" fill="#4a90e2" rx="2"/>
-        <text x="17" y="110" text-anchor="middle" dominant-baseline="middle" transform="rotate(-90, 17, 110)" font-size="18" fill="#666" font-family="Arial" font-weight="bold" pointer-events="none">EMBRAGUE</text>
+        <g id="clutch-bar">
+          <rect x="5" y="10" width="24" height="200" fill="none" stroke="#666" stroke-width="1.5" rx="2"/>
+          <rect id="clutch-fill" x="5" y="10" width="24" height="200" fill="#4a90e2" rx="2"/>
+          <text x="17" y="110" text-anchor="middle" dominant-baseline="middle" transform="rotate(-90, 17, 110)" font-size="18" fill="#666" font-family="Arial" font-weight="bold" pointer-events="none">EMBRAGUE</text>
+        </g>
         <!-- Freno (centro) -->
         <rect x="33" y="10" width="24" height="200" fill="none" stroke="#666" stroke-width="1.5" rx="2"/>
         <rect id="brake-fill" x="33" y="10" width="24" height="200" fill="#e74c3c" rx="2"/>
