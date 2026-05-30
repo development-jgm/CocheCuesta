@@ -879,22 +879,26 @@ async function openSerialPort(port) {
         if (parts.length < 2) continue;
         dataCount++;
         if (dataCount === 1) console.log('✓ Recibidos datos del Arduino:', line);
-      const rawBrake  = parseInt(parts[0], 10);
-      const rawClutch = parseInt(parts[1], 10);
-      if (!isNaN(rawBrake)) {
-        let v = Math.max(0, Math.min(100, rawBrake));
-        if (v >= BRAKE_DEADBAND) v = 100;
-        brakeValue = v;
-      }
-      if (!isNaN(rawClutch)) {
-        clutchValue = Math.max(0, Math.min(100, rawClutch));
-        updateGearSelector();
-      }
-      const rawAccel = parseInt(parts[2], 10);
-      if (!isNaN(rawAccel)) {
-        acceleratorValue = Math.max(0, Math.min(100, rawAccel));
+        const rawBrake  = parseInt(parts[0], 10);
+        const rawClutch = parseInt(parts[1], 10);
+        if (!isNaN(rawBrake)) {
+          let v = Math.max(0, Math.min(100, rawBrake));
+          if (v >= BRAKE_DEADBAND) v = 100;
+          brakeValue = v;
+        }
+        if (!isNaN(rawClutch)) {
+          clutchValue = Math.max(0, Math.min(100, rawClutch));
+          updateGearSelector();
+        }
+        const rawAccel = parseInt(parts[2], 10);
+        if (!isNaN(rawAccel)) {
+          acceleratorValue = Math.max(0, Math.min(100, rawAccel));
+        }
       }
     }
+  } catch (e) {
+    console.error('Error al leer puerto serial:', e);
+    arduinoConnected = false;
   }
 }
 
