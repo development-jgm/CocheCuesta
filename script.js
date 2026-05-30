@@ -530,6 +530,11 @@ function updatePedalsGauge() {
   const brakeFill = document.getElementById('brake-fill');
   const accelFill = document.getElementById('accel-fill');
 
+  // Mostrar valores numéricos
+  document.getElementById('clutch-val').textContent = clutchValue.toFixed(0);
+  document.getElementById('brake-val').textContent = brakeValue.toFixed(0);
+  document.getElementById('accel-val').textContent = acceleratorValue.toFixed(0);
+
   // Altura total: 200 SVG units
   const totalHeight = 200;
   const maxY = 10;
