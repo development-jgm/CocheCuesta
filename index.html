@@ -37,6 +37,12 @@
     </div>
     <div id="pedals-container" style="position: absolute; top: 15px; left: 495px; z-index: 10;">
       <svg id="pedals-gauge" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 220" width="90" height="220">
+        <defs>
+          <pattern id="handbrake-pattern" x="0" y="0" width="6" height="6" patternUnits="userSpaceOnUse">
+            <rect width="6" height="6" fill="#ccc"/>
+            <circle cx="3" cy="3" r="1.5" fill="#999"/>
+          </pattern>
+        </defs>
         <!-- Embrague (izquierda) -->
         <rect x="5" y="10" width="24" height="200" fill="none" stroke="#666" stroke-width="1.5" rx="2"/>
         <rect id="clutch-fill" x="5" y="10" width="24" height="200" fill="#4a90e2" rx="2"/>
@@ -44,7 +50,9 @@
         <!-- Freno (centro) -->
         <rect x="33" y="10" width="24" height="200" fill="none" stroke="#666" stroke-width="1.5" rx="2"/>
         <rect id="brake-fill" x="33" y="10" width="24" height="200" fill="#e74c3c" rx="2"/>
+        <rect id="handbrake-overlay" x="33" y="10" width="24" height="200" fill="url(#handbrake-pattern)" rx="2" display="none"/>
         <text x="45" y="110" text-anchor="middle" dominant-baseline="middle" transform="rotate(-90, 45, 110)" font-size="18" fill="#666" font-family="Arial" font-weight="bold" pointer-events="none">FRENO</text>
+        <text id="handbrake-icon" x="45" y="60" text-anchor="middle" dominant-baseline="middle" font-size="22" fill="#c0392b" font-family="Arial" font-weight="bold" display="none">!</text>
         <!-- Acelerador (derecha) -->
         <rect x="61" y="10" width="24" height="200" fill="none" stroke="#666" stroke-width="1.5" rx="2"/>
         <rect id="accel-fill" x="61" y="10" width="24" height="200" fill="#2ecc71" rx="2"/>

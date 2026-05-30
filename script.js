@@ -152,7 +152,8 @@ function animate(timestamp) {
   // Motor: cuesta arriba proporcional al embrague soltado y acelerador
   const engagement    = gear !== 'N' ? Math.max(0, 1 - clutchValue / 100) : 0;
   const gearRatio     = GEAR_RATIOS[gear] || 0;
-  const accelFactor   = acceleratorValue / 100; // 0 a 1 según pedal acelerador
+  const accelDeadband = 5; // ignora valores menores al 5% (ruido del potenciómetro)
+  const accelFactor   = acceleratorValue > accelDeadband ? acceleratorValue / 100 : 0;
   // Boost de engagement solo si estamos bajando (necesitamos frenar la caída)
   const isDescending = vel < -ENGINE_MAX_VEL * 0.1;
   const engagementBoost = isDescending ? engagement * (1 - accelFactor) * 0.5 : 0;
@@ -167,7 +168,7 @@ function animate(timestamp) {
   // Se cala si embrague soltado sin acelerador suficiente y sin inercia
   // Cuando está bajando, necesita más acelerador para no calarse
   // También se cala si hay freno fuerte (freno de mano o freno de pedal fuerte)
-  const minAccelForMaintain = isDescending ? 0.15 : 0.02;
+  const minAccelForMaintain = isDescending ? 0.25 : 0.18;
   const isAcceleratingEnough = accelFactor >= minAccelForMaintain;
   const hasEnoughSpeed = vel < 0 && Math.abs(vel) > ENGINE_MAX_VEL * 0.5; // inercia de bajada
   const totalBrake = Math.max(handbrake ? 100 : 0, brakeValue); // máximo de ambos frenos
@@ -558,6 +559,17 @@ function updatePedalsGauge() {
   const accelY = maxY + totalHeight - accelHeight;
   accelFill.setAttribute('y', accelY);
   accelFill.setAttribute('height', accelHeight);
+
+  // Freno de mano: overlay punteado e icono
+  const overlay = document.getElementById('handbrake-overlay');
+  const icon = document.getElementById('handbrake-icon');
+  if (handbrake) {
+    overlay.setAttribute('display', 'inline');
+    icon.setAttribute('display', 'inline');
+  } else {
+    overlay.setAttribute('display', 'none');
+    icon.setAttribute('display', 'none');
+  }
 }
 
 function updateStallLight(stalled) {
