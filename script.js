@@ -86,15 +86,151 @@ let portOpening      = false;
 let electricMode     = false;
 const ACCEL_DEADBAND = 5; // ignora valores menores al 5% (ruido del potenciómetro)
 
+// ── Ciudad ────────────────────────────────────────────────────────────────────
+let cityMode            = false;
+let cityTransition   = false;
+const CITY_TARGET_POSX = 0.6;
+let cityElements  = []; // { el, x, width }
+let cityRightEdge = 0;
+
+const NS = 'http://www.w3.org/2000/svg';
+
+function makeSvgEl(tag, attrs) {
+  const el = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+
+function makeCityHouse() {
+  const w  = 60 + Math.random() * 60;
+  const h  = 60 + Math.random() * 80;
+  const wallColors  = ['#d4956a','#c8a882','#b8c5d6','#e8d5b7','#d6b8b8','#bfc9a8'];
+  const roofColors  = ['#8b4513','#6b8e23','#4a4a6a','#8b6914','#7a3b3b'];
+  const ci = Math.floor(Math.random() * wallColors.length);
+  const g = makeSvgEl('g', {});
+
+  g.appendChild(makeSvgEl('rect', { x:0, y:-h, width:w, height:h, fill:wallColors[ci] }));
+  const roofH = w * 0.4;
+  g.appendChild(makeSvgEl('polygon', {
+    points: `0,${-h} ${w/2},${-h-roofH} ${w},${-h}`,
+    fill: roofColors[ci % roofColors.length]
+  }));
+  const dw = w * 0.22, dh = h * 0.38;
+  g.appendChild(makeSvgEl('rect', { x:(w-dw)/2, y:-dh, width:dw, height:dh, fill:'#5d3a1a', rx:dw*0.2 }));
+  [w*0.08, w*0.58].forEach(wx => {
+    g.appendChild(makeSvgEl('rect', {
+      x:wx, y:-h*0.75, width:w*0.2, height:h*0.22,
+      fill:'#87ceeb', stroke:'#555', 'stroke-width':1, rx:2
+    }));
+  });
+  return { el: g, width: w + 10 + Math.random() * 20 };
+}
+
+function makeCityTree() {
+  const h = 55 + Math.random() * 45;
+  const r = 18 + Math.random() * 14;
+  const greens = ['#228b22','#2d8b2d','#3a7d3a','#1a6b1a','#4a7c4a'];
+  const g = makeSvgEl('g', {});
+  g.appendChild(makeSvgEl('rect', { x:-4, y:-h, width:8, height:h, fill:'#7a5230' }));
+  g.appendChild(makeSvgEl('circle', { cx:0, cy:-h-r*0.5, r, fill:greens[Math.floor(Math.random()*greens.length)] }));
+  return { el: g, width: r * 2 + 10 + Math.random() * 20 };
+}
+
+function makeCityLamppost() {
+  const g = makeSvgEl('g', {});
+  g.appendChild(makeSvgEl('rect', { x:-3, y:-85, width:6, height:85, fill:'#888' }));
+  g.appendChild(makeSvgEl('line', { x1:0, y1:-85, x2:22, y2:-85, stroke:'#888', 'stroke-width':4 }));
+  g.appendChild(makeSvgEl('ellipse', { cx:22, cy:-83, rx:8, ry:5, fill:'#fffacd' }));
+  return { el: g, width: 35 + Math.random() * 20 };
+}
+
+function spawnCityEl(svg, x) {
+  const r = Math.random();
+  const made = r < 0.5 ? makeCityHouse() : r < 0.82 ? makeCityTree() : makeCityLamppost();
+  svg.appendChild(made.el);
+  return { el: made.el, x, width: made.width };
+}
+
+function initCityMode() {
+  const svg = document.getElementById('ciudad-svg');
+  svg.style.display = '';
+  cityElements = [];
+  const w = rectEl.clientWidth;
+  // Primer edificio justo fuera del borde derecho
+  cityRightEdge = w + 30;
+}
+
+function exitCityMode() {
+  const svg = document.getElementById('ciudad-svg');
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  cityElements = [];
+  svg.style.display = 'none';
+}
+
+// scrollPx: píxeles a desplazar este frame (ya calculado fuera)
+function updateCity(scrollPx) {
+  if (!cityMode || scrollPx <= 0) return;
+  const svg = document.getElementById('ciudad-svg');
+  const w   = rectEl.clientWidth;
+  const gh  = rectEl.clientHeight;
+
+  // Mover todos los elementos
+  for (const elem of cityElements) elem.x -= scrollPx;
+  cityRightEdge -= scrollPx;
+
+  // Eliminar los que salen por la izquierda
+  while (cityElements.length && cityElements[0].x + cityElements[0].width < 0) {
+    cityElements[0].el.remove();
+    cityElements.shift();
+  }
+
+  // Spawn nuevos por la derecha
+  while (cityRightEdge < w + 400) {
+    const elem = spawnCityEl(svg, cityRightEdge);
+    cityElements.push(elem);
+    cityRightEdge += elem.width;
+  }
+
+  // Actualizar transforms
+  for (const elem of cityElements) {
+    elem.el.setAttribute('transform', `translate(${elem.x.toFixed(1)},${gh-18})`);
+  }
+}
+
 // Audio eléctrico
 let electricOsc      = null;
 let electricGain     = null;
 
 const gearInputs = document.querySelectorAll('input[name="marcha"]');
 
+function updateGearHighlight() {
+  const enabled = clutchValue >= CLUTCH_ENABLE_THR;
+  for (const val of ['N','1','2','3','4','5']) {
+    const el = document.getElementById(`gear-svg-${val}`);
+    if (!el) continue;
+    const circle = el.querySelector('circle');
+    const text   = el.querySelector('text');
+    const sel    = gear === val;
+    if (sel) {
+      circle.setAttribute('fill', val === 'N' ? '#ff8c00' : '#ffd700');
+      circle.setAttribute('stroke', val === 'N' ? '#ff8c00' : '#ffd700');
+      text.setAttribute('fill', '#000');
+    } else if (enabled) {
+      circle.setAttribute('fill', val === 'N' ? '#1a1000' : '#1a1a1a');
+      circle.setAttribute('stroke', '#555');
+      text.setAttribute('fill', '#777');
+    } else {
+      circle.setAttribute('fill', '#0d0d0d');
+      circle.setAttribute('stroke', '#333');
+      text.setAttribute('fill', '#333');
+    }
+  }
+}
+
 function updateGearSelector() {
   const enabled = clutchValue >= CLUTCH_ENABLE_THR;
   gearInputs.forEach(inp => inp.disabled = !enabled);
+  updateGearHighlight();
 }
 
 gearInputs.forEach(inp =>
@@ -111,8 +247,12 @@ gearInputs.forEach(inp =>
 function applyPendiente(val) {
   val = Math.max(0, Math.min(100, val));
   slider.value = val;
-  triangulo.style.clipPath = `polygon(0% 100%, 100% 100%, 100% ${100 - val}%)`;
+  triangulo.style.clipPath = `polygon(0% 101%, 100% 101%, 100% ${100 - val}%)`;
   valor.textContent = `${val}%`;
+  document.getElementById('calle').style.display = val === 0 ? '' : 'none';
+  // Banda inferior: gris asfalto en llano, marrón cuesta con pendiente
+  const banda = document.getElementById('fondo-inferior');
+  if (banda) banda.style.backgroundColor = val === 0 ? '#555' : '#9C6B3C';
 }
 
 slider.addEventListener('input', () => {
@@ -211,6 +351,17 @@ function animate(timestamp) {
     stallTimer    = 0;
   }
   updateStallLight(engineStalled);
+  updateHandbrakeLight(handbrake);
+
+  // Aviso de freno de mano: motor en marcha + acelerador pisado + freno de mano
+  if (engineRunning && !engineStalled && handbrake && acceleratorValue > ACCEL_DEADBAND) {
+    showHandbrakeMessage();
+  }
+
+  // Aviso de freno+acelerador simultáneos
+  if (engineRunning && !engineStalled && brakeValue > 20 && acceleratorValue > ACCEL_DEADBAND) {
+    showBrakeAccelMessage();
+  }
   const targetVel  = effectiveBrake >= BRAKE_DEADBAND ? 0 : physTarget * (1 - effectiveBrake / 100);
 
   const decelerating = Math.abs(targetVel) < Math.abs(vel) ||
@@ -220,14 +371,61 @@ function animate(timestamp) {
 
   posX += vel * dt;
   if (posX <= 0) { posX = 0; if (vel < 0) vel = 0; }
-  if (posX >= 1) { posX = 1; if (vel > 0) vel = 0; }
+  if (posX >= 1) {
+    posX = 1;
+    if (vel > 0) vel = 0;
+    // Entra en modo ciudad solo si la pendiente es 0
+    if (Number(slider.value) === 0 && engineRunning && !engineStalled && !cityMode) {
+      cityMode       = true;
+      cityTransition = true;
+      initCityMode();
+    }
+  }
 
-  // Radio rueda: 9 SVG units × escala (320px / 80 SVG) = 36 px
-  const wheelRpx = 9 * (CAJA_W / 80);
-  // vel<0 = baja (antihorario), vel>0 = sube (horario)
-  wheelAngle += (vel * rectEl.clientWidth / wheelRpx) * (180 / Math.PI) * dt;
-  wfEl.setAttribute('transform', `rotate(${wheelAngle}, 16, 31)`);
-  wrEl.setAttribute('transform', `rotate(${wheelAngle}, 62, 31)`);
+  // En modo ciudad: transición suave y luego scroll continuo
+  if (cityMode) {
+    if (Number(slider.value) !== 0 || !engineRunning || engineStalled) {
+      cityMode       = false;
+      cityTransition = false;
+      exitCityMode();
+    } else {
+      vel = 0;
+      let scrollPx = 0;
+
+      if (cityTransition) {
+        // Transición: coche se mueve hacia el centro a la velocidad del acelerador
+        const accelN = electricMode ? (acceleratorValue / 100) * 2.5 : acceleratorValue / 100;
+        scrollPx = accelN * MAX_VEL * rectEl.clientWidth * 1.5 * dt;
+        posX -= scrollPx / rectEl.clientWidth;
+        if (posX <= CITY_TARGET_POSX) {
+          posX = CITY_TARGET_POSX;
+          cityTransition = false;
+        }
+      } else {
+        // Fase normal: acelerador controla el scroll
+        posX = CITY_TARGET_POSX;
+        const accelN = electricMode ? (acceleratorValue / 100) * 2.5 : acceleratorValue / 100;
+        scrollPx = accelN * MAX_VEL * rectEl.clientWidth * 1.5 * dt;
+      }
+
+      updateCity(scrollPx);
+
+      // Animar ruedas proporcional al scroll
+      const wheelRpxCity = 9 * (CAJA_W / 80);
+      const wheelVel = scrollPx / dt / rectEl.clientWidth;
+      wheelAngle += (wheelVel * rectEl.clientWidth / wheelRpxCity) * (180 / Math.PI) * dt;
+      wfEl.setAttribute('transform', `rotate(${wheelAngle}, 16, 31)`);
+      wrEl.setAttribute('transform', `rotate(${wheelAngle}, 62, 31)`);
+    }
+  }
+
+  if (!cityMode) {
+    // Radio rueda: 9 SVG units × escala (320px / 80 SVG) = 36 px
+    const wheelRpx = 9 * (CAJA_W / 80);
+    wheelAngle += (vel * rectEl.clientWidth / wheelRpx) * (180 / Math.PI) * dt;
+    wfEl.setAttribute('transform', `rotate(${wheelAngle}, 16, 31)`);
+    wrEl.setAttribute('transform', `rotate(${wheelAngle}, 62, 31)`);
+  }
 
   // Temblor de carrocería: combustión siempre tiembla en ralentí, eléctrico solo al acelerar
   const isRunningOk = engineRunning && !engineStalled;
@@ -244,8 +442,15 @@ function animate(timestamp) {
   }
 
   renderCaja();
-  const movingForward = vel > 0;
-  const displaySpeed = (gear !== 'N' && !engineStalled && movingForward) ? vel * SLOPE_M * 3600 : 0;
+  let displaySpeed;
+  if (cityMode && engineRunning) {
+    // En modo ciudad vel=0, calculamos velocidad desde el acelerador
+    const accelN = electricMode ? (acceleratorValue / 100) * 2.5 : acceleratorValue / 100;
+    displaySpeed = accelN * MAX_VEL * 1.5 * SLOPE_M * 3600;
+  } else {
+    const movingForward = vel > 0;
+    displaySpeed = (gear !== 'N' && !engineStalled && movingForward) ? vel * SLOPE_M * 3600 : 0;
+  }
   updateGauge(displaySpeed);
   // RPM: eléctrico proporcional al acelerador (sin ralentí), combustión con ralentí
   const rpm = isRunningOk
@@ -420,20 +625,252 @@ function initGauge() {
   }, '00000 km'));
 
   // Testigo de motor calado (apagado por defecto)
-  svg.appendChild(svgEl('circle', { id: 'stallLight', cx: GCX - 55, cy: GCY + 75, r: 7, fill: '#1a0000' }));
+  svg.appendChild(svgEl('circle', { id: 'stallLight', cx: GCX - 55, cy: GCY + 65, r: 7, fill: '#1a0000' }));
   svg.appendChild(svgEl('text', {
-    x: GCX - 55, y: GCY + 88, 'text-anchor': 'middle',
+    x: GCX - 55, y: GCY + 78, 'text-anchor': 'middle',
     fill: '#2a0000', 'font-size': 6, 'font-family': 'Arial,sans-serif', 'letter-spacing': 0.5
   }, 'MOTOR'));
   svg.appendChild(svgEl('text', {
     id: 'stallText',
-    x: GCX + 10, y: GCY + 88, 'text-anchor': 'middle',
+    x: GCX + 10, y: GCY + 78, 'text-anchor': 'middle',
     fill: '#1a0000', 'font-size': 7.5, 'font-family': 'Arial,sans-serif',
     'font-weight': 'bold', 'letter-spacing': 1
   }, 'CALADO'));
 
+  // Testigo de freno de mano: círculo + arcos laterales + ! + BRAKE
+  const hbx = GCX - 30, hby = GCY + 65;
+  svg.appendChild(svgEl('circle', { id: 'handbrakLight', cx: hbx, cy: hby, r: 7, fill: '#111', stroke: '#300000', 'stroke-width': 1 }));
+  svg.appendChild(svgEl('path',   { id: 'handbrakArcL', d: `M ${hbx-9} ${hby-5} A 6 6 0 0 0 ${hbx-9} ${hby+5}`, fill: 'none', stroke: '#300000', 'stroke-width': 1.8, 'stroke-linecap': 'round' }));
+  svg.appendChild(svgEl('path',   { id: 'handbrakArcR', d: `M ${hbx+9} ${hby-5} A 6 6 0 0 1 ${hbx+9} ${hby+5}`, fill: 'none', stroke: '#300000', 'stroke-width': 1.8, 'stroke-linecap': 'round' }));
+  svg.appendChild(svgEl('text',   { id: 'handbrakExcl', x: hbx, y: hby + 1, 'text-anchor': 'middle', 'dominant-baseline': 'middle', fill: '#300000', 'font-size': 9, 'font-family': 'Arial,sans-serif', 'font-weight': 'bold' }, '!'));
+  svg.appendChild(svgEl('text',   { id: 'handbrakLabel', x: hbx, y: hby + 15, 'text-anchor': 'middle', fill: '#300000', 'font-size': 5, 'font-family': 'Arial,sans-serif', 'letter-spacing': 0.5 }, 'BRAKE'));
+
+  // ── Llave de contacto en el cuadro ────────────────────────────────────────
+  const swG = svgEl('g', {
+    id: 'llave-switch-g',
+    transform: 'translate(70,295) scale(1.75) translate(-27,-27)',
+    style: 'cursor:pointer'
+  });
+  swG.appendChild(svgEl('circle', { cx: 27, cy: 27, r: 24, fill: '#1a1a1a', stroke: '#444', 'stroke-width': 2 }));
+
+  // Marcas de posición (solo líneas)
+  for (const angle of [180, 240, 300]) {
+    const rad = angle * Math.PI / 180;
+    const dx = Math.cos(rad), dy = Math.sin(rad);
+    swG.appendChild(svgEl('line', {
+      x1: 27 + dx*23, y1: 27 + dy*23,
+      x2: 27 + dx*30, y2: 27 + dy*30,
+      stroke: '#bbb', 'stroke-width': 2.5, 'stroke-linecap': 'round'
+    }));
+  }
+
+  swG.appendChild(svgEl('ellipse', { cx: 27, cy: 27, rx: 3, ry: 4, fill: '#000', stroke: '#555', 'stroke-width': 1 }));
+  const keyG = svgEl('g', { id: 'llave-key', transform: 'rotate(180, 27, 27)', display: 'none' });
+  // Hoja (blade) con dientes
+  keyG.appendChild(svgEl('rect', { x: 27, y: 25.8, width: 14, height: 2.4, fill: '#e8c830' })); // hoja principal
+  keyG.appendChild(svgEl('rect', { x: 29.5, y: 23.5, width: 2.5, height: 2.3, rx: 0.4, fill: '#e8c830' })); // diente 1
+  keyG.appendChild(svgEl('rect', { x: 33.5, y: 23.5, width: 2, height: 2.3, rx: 0.3, fill: '#e8c830' })); // diente 2
+  keyG.appendChild(svgEl('rect', { x: 37, y: 23.5, width: 1.5, height: 2.3, rx: 0.3, fill: '#e8c830' })); // diente 3
+  // Cabeza oval (bow)
+  keyG.appendChild(svgEl('ellipse', { cx: 47, cy: 27, rx: 6.5, ry: 5.5, fill: '#ffd700', stroke: '#c8a800', 'stroke-width': 0.8 }));
+  keyG.appendChild(svgEl('ellipse', { cx: 47, cy: 27, rx: 2.5, ry: 2.5, fill: '#1a1a1a' })); // agujero llavero
+  swG.appendChild(keyG);
+  swG.appendChild(svgEl('circle', { cx: 27, cy: 27, r: 24, fill: 'transparent' }));
+  svg.appendChild(swG);
+
+  // ── Botón START/STOP eléctrico ────────────────────────────────────────────
+  const btnG = svgEl('g', {
+    id: 'btn-start-stop',
+    transform: 'translate(70,295) scale(1.75) translate(-27,-27)',
+    display: 'none',
+    style: 'cursor:pointer'
+  });
+  btnG.appendChild(svgEl('circle', { cx: 27, cy: 27, r: 24, fill: '#0a0a0a', stroke: '#333', 'stroke-width': 2 }));
+  btnG.appendChild(svgEl('circle', { id: 'btn-ring', cx: 27, cy: 27, r: 20, fill: 'none', stroke: '#1a1a1a', 'stroke-width': 3 }));
+  btnG.appendChild(svgEl('circle', { id: 'btn-face', cx: 27, cy: 27, r: 16, fill: '#111' }));
+  btnG.appendChild(svgEl('text',   { id: 'btn-label', x: 27, y: 25, 'text-anchor': 'middle', 'dominant-baseline': 'middle',
+    fill: '#444', 'font-size': 5, 'font-family': 'Arial,sans-serif', 'font-weight': 'bold', 'letter-spacing': 0.5 }, 'START'));
+  btnG.appendChild(svgEl('text',   { x: 27, y: 32, 'text-anchor': 'middle', 'dominant-baseline': 'middle',
+    fill: '#333', 'font-size': 4, 'font-family': 'Arial,sans-serif', 'letter-spacing': 0.5 }, 'STOP'));
+  btnG.appendChild(svgEl('circle', { cx: 27, cy: 27, r: 24, fill: 'transparent' }));
+  svg.appendChild(btnG);
+
+  btnG.addEventListener('click', () => {
+    if (!electricMode) return;
+    engineRunning = !engineRunning;
+    arrancarEl.checked = engineRunning;
+    if (engineRunning) {
+      ensureAudioCtx();
+      initElectricAudio();
+      engineStalled = false;
+      stallTimer    = 0;
+      playElectricChime(true);
+    } else {
+      playElectricChime(false);
+    }
+    updateStartStopButton();
+  });
+
+  swG.addEventListener('click', (e) => {
+    if (e.shiftKey) {
+      applyKeyPosition(keyPos - 1);
+    } else {
+      applyKeyPosition(keyPos === -1 ? 0 : keyPos >= 2 ? 1 : keyPos + 1);
+    }
+  });
+
+  // ── Selector de marchas en H ────────────────────────────────────────────────
+  const gdx = 22, gdy = 22;
+  const gsx = 215, gsy = 295;
+
+  const gearHG = svgEl('g', {
+    id: 'gear-h-group',
+    transform: `translate(${gsx},${gsy}) scale(2) translate(${-gsx},${-gsy})`
+  });
+
+
+  // Círculos de marcha — 2 y 4 centrados y separados igual que 1-3
+  const gearDefs = [
+    { val: '1', gx: gsx-gdx,     gy: gsy-gdy },
+    { val: '3', gx: gsx,         gy: gsy-gdy },
+    { val: '5', gx: gsx+gdx,     gy: gsy-gdy },
+    { val: 'N', gx: gsx,         gy: gsy     },
+    { val: '2', gx: gsx-gdx/2,   gy: gsy+gdy },
+    { val: '4', gx: gsx+gdx/2,   gy: gsy+gdy },
+  ];
+
+  for (const gd of gearDefs) {
+    const cg = svgEl('g', { id: `gear-svg-${gd.val}`, style: 'cursor:pointer' });
+    cg.appendChild(svgEl('circle', { cx: gd.gx, cy: gd.gy, r: 8,
+      fill: gd.val === 'N' ? '#1a1000' : '#1a1a1a', stroke: '#555', 'stroke-width': 1.5 }));
+    cg.appendChild(svgEl('text', { x: gd.gx, y: gd.gy, 'text-anchor': 'middle',
+      'dominant-baseline': 'middle', fill: '#777',
+      'font-size': gd.val === 'N' ? 6 : 7,
+      'font-family': 'Arial,sans-serif', 'font-weight': 'bold' }, gd.val));
+    gearHG.appendChild(cg);
+
+    cg.addEventListener('click', () => {
+      if (clutchValue < CLUTCH_ENABLE_THR) {
+        showClutchMessage();
+        return;
+      }
+      gear = gd.val;
+      stallTimer = 0;
+      updateGearHighlight();
+    });
+  }
+
+  svg.appendChild(gearHG);
+
+  // ── Palanca de freno de mano ──────────────────────────────────────────────
+  const hbpx = 70, hbpy = 405; // pivot en gauge SVG (debajo del contacto)
+
+  const hbG = svgEl('g', { id: 'hb-lever-g', transform: `translate(${hbpx},${hbpy})`, style: 'cursor:pointer' });
+
+  // Embellecedor: sector dinámico (vértice en pivote, base horizontal, lado siguiendo la palanca)
+  hbG.appendChild(svgEl('path', {
+    id: 'hb-sector',
+    d: '', fill: '#0d0d0d', stroke: '#3a3a3a', 'stroke-width': 1.2,
+    'stroke-linejoin': 'round'
+  }));
+
+  // Pivote
+  hbG.appendChild(svgEl('circle', { cx:0, cy:4, r:5.5, fill:'#1e1e1e', stroke:'#666', 'stroke-width':1.2 }));
+
+  // Brazo de la palanca (rota alrededor del pivote 0,4)
+  const hbArm = svgEl('g', { id: 'hb-arm' });
+  hbArm.style.transformBox    = 'fill-box';
+  hbArm.style.transformOrigin = '50% 100%';
+  // Sin transition CSS: la animación se hace por JS para sincronizar con el sector
+
+  // Caña
+  hbArm.appendChild(svgEl('rect',   { x:-3, y:-42, width:6, height:46, rx:2, fill:'#1a1a1a', stroke:'#0a0a0a', 'stroke-width':0.5 }));
+  hbArm.appendChild(svgEl('rect',   { x:-1.5, y:-42, width:2, height:46, rx:1, fill:'#333', opacity:'0.5' })); // brillo
+  // Anillo
+  hbArm.appendChild(svgEl('rect',   { x:-4, y:-14, width:8, height:4, rx:1.5, fill:'#222', stroke:'#0a0a0a', 'stroke-width':0.5 }));
+  // Empuñadura de goma
+  hbArm.appendChild(svgEl('rect',   { x:-5.5, y:-58, width:11, height:18, rx:5, fill:'#1a1a1a', stroke:'#444', 'stroke-width':1 }));
+  // Textura de agarre (líneas horizontales)
+  for (let ry = -54; ry <= -45; ry += 3) {
+    hbArm.appendChild(svgEl('rect', { x:-4.5, y:ry, width:9, height:1.2, rx:0.6, fill:'#333' }));
+  }
+  // Botón de desbloqueo metálico en la punta
+  hbArm.appendChild(svgEl('ellipse', { cx:0, cy:-58, rx:4.5, ry:3.2, fill:'#404040', stroke:'#000', 'stroke-width':0.6 })); // bisel exterior
+  hbArm.appendChild(svgEl('ellipse', { cx:0, cy:-58, rx:3.5, ry:2.5, fill:'#bbb', stroke:'#666', 'stroke-width':0.4 }));   // cuerpo metálico
+  hbArm.appendChild(svgEl('ellipse', { cx:-0.8, cy:-58.7, rx:2, ry:1.1, fill:'#fff', opacity:'0.6' }));                    // brillo superior
+  hbArm.appendChild(svgEl('ellipse', { cx:0.5, cy:-57.4, rx:1, ry:0.4, fill:'#888', opacity:'0.5' }));                     // sombra inferior
+
+  hbG.appendChild(hbArm);
+
+  // Área transparente grande para facilitar el click (UX)
+  hbG.appendChild(svgEl('rect', { x:-15, y:-70, width:85, height:90, fill:'transparent' }));
+
+  svg.appendChild(hbG);
+
+  hbG.addEventListener('click', () => {
+    handbrake = !handbrake;
+    frenoMano.checked = handbrake;
+    updateLeverAnim();
+    if (!handbrake && !arduinoConnected) connectArduino();
+  });
+
   // ── Tacómetro ────────────────────────────────────────────────────────────────
   buildRpmDial(svg);
+
+  // Estado inicial correcto de marchas y llave
+  requestAnimationFrame(() => {
+    updateGearHighlight();
+    updateHandbrakeLight(handbrake);
+    updateLeverAnim();
+  });
+}
+
+let hbLeverAngle = 45; // ángulo actual de la palanca
+let hbAnimReqId  = null;
+
+function updateLeverVisual() {
+  const arm    = document.getElementById('hb-arm');
+  const sector = document.getElementById('hb-sector');
+  if (!arm || !sector) return;
+
+  arm.style.transform = `rotate(${hbLeverAngle}deg)`;
+
+  // Sector: vértice en pivote (0,4); lado horizontal a la derecha; otro lado siguiendo la palanca; arco entre ambos
+  const r = 52;
+  const px = 0, py = 4;
+  const rad = hbLeverAngle * Math.PI / 180;
+  // Endpoint del lado de la palanca: la palanca sube desde el pivote
+  const lx = px + r * Math.sin(rad);
+  const ly = py - r * Math.cos(rad);
+  const hx = px + r;       // endpoint horizontal
+  const hy = py;
+
+  if (hbLeverAngle >= 89.5) {
+    sector.setAttribute('d', '');
+  } else {
+    // Arco desde el endpoint horizontal hasta el endpoint de la palanca, en sentido antihorario (hacia arriba)
+    sector.setAttribute('d',
+      `M ${px},${py} L ${hx},${hy} A ${r},${r} 0 0 0 ${lx.toFixed(2)},${ly.toFixed(2)} Z`);
+  }
+}
+
+function updateLeverAnim() {
+  if (hbAnimReqId) cancelAnimationFrame(hbAnimReqId);
+  const target = handbrake ? 45 : 90;
+  const start  = hbLeverAngle;
+  const delta  = target - start;
+  const dur    = 400;
+  const t0     = performance.now();
+
+  function step(now) {
+    const t = Math.min((now - t0) / dur, 1);
+    const ease = 1 - Math.pow(1 - t, 3);
+    hbLeverAngle = start + delta * ease;
+    updateLeverVisual();
+    if (t < 1) hbAnimReqId = requestAnimationFrame(step);
+    else hbAnimReqId = null;
+  }
+  hbAnimReqId = requestAnimationFrame(step);
 }
 
 function buildRpmDial(svg) {
@@ -508,14 +945,15 @@ function buildRpmDial(svg) {
 }
 
 function updateRpmGauge(rpm) {
-  const angle = gAngle(rpm, RPM_GAUGE_MAX);
+  const dashOn = keyPos >= 1;
+  const angle = gAngle(dashOn ? rpm : 0, RPM_GAUGE_MAX);
 
   const needle = document.getElementById('rpmNeedle');
   if (needle) needle.setAttribute('transform', `rotate(${angle}, ${GCX2}, ${GCY})`);
 
   const arc = document.getElementById('rpmArc');
   if (arc) {
-    if (rpm < 10) {
+    if (!dashOn || rpm < 10) {
       arc.setAttribute('opacity', 0);
     } else {
       arc.setAttribute('opacity', 1);
@@ -527,17 +965,18 @@ function updateRpmGauge(rpm) {
   }
 
   const dig = document.getElementById('rpmDigital');
-  if (dig) dig.textContent = Math.round(rpm);
+  if (dig) dig.textContent = dashOn ? Math.round(rpm) : '';
 }
 
 function updateGauge(speedKmh) {
-  const angle = gAngle(speedKmh);
+  const dashOn = keyPos >= 1;
+  const angle = gAngle(dashOn ? speedKmh : 0);
 
   document.getElementById('gaugeNeedle')
     .setAttribute('transform', `rotate(${angle}, ${GCX}, ${GCY})`);
 
   const arc = document.getElementById('speedArc');
-  if (speedKmh < 0.5) {
+  if (!dashOn || speedKmh < 0.5) {
     arc.setAttribute('opacity', 0);
   } else {
     arc.setAttribute('opacity', 1);
@@ -547,7 +986,7 @@ function updateGauge(speedKmh) {
       speedKmh < 100 ? '#ffaa00' : '#ff3333');
   }
 
-  document.getElementById('gaugeDigital').textContent = speedKmh.toFixed(1);
+  document.getElementById('gaugeDigital').textContent = dashOn ? speedKmh.toFixed(1) : '';
 }
 
 function updatePedalsGauge() {
@@ -555,10 +994,13 @@ function updatePedalsGauge() {
   const brakeFill = document.getElementById('brake-fill');
   const accelFill = document.getElementById('accel-fill');
 
-  // Mostrar valores numéricos
-  document.getElementById('clutch-val').textContent = clutchValue.toFixed(0);
-  document.getElementById('brake-val').textContent = brakeValue.toFixed(0);
-  document.getElementById('accel-val').textContent = acceleratorValue.toFixed(0);
+  // En modo eléctrico ocultar barra de embrague (el % va dentro, se oculta solo)
+  document.getElementById('clutch-bar').setAttribute('display', electricMode ? 'none' : '');
+
+  // Mostrar valores numéricos con %
+  document.getElementById('clutch-val').textContent = clutchValue.toFixed(0) + '%';
+  document.getElementById('brake-val').textContent  = brakeValue.toFixed(0)  + '%';
+  document.getElementById('accel-val').textContent  = acceleratorValue.toFixed(0) + '%';
 
   // Altura total: 200 SVG units
   const totalHeight = 200;
@@ -592,6 +1034,41 @@ function updatePedalsGauge() {
     overlay.setAttribute('display', 'none');
     icon.setAttribute('display', 'none');
   }
+}
+
+function updateStartStopButton() {
+  const ring  = document.getElementById('btn-ring');
+  const face  = document.getElementById('btn-face');
+  const label = document.getElementById('btn-label');
+  if (!ring) return;
+  if (engineRunning) {
+    ring.setAttribute('stroke', '#00cc44');
+    ring.setAttribute('filter', 'url(#glow)');
+    face.setAttribute('fill', '#0a1a0a');
+    label.setAttribute('fill', '#00cc44');
+  } else {
+    ring.setAttribute('stroke', '#1a1a1a');
+    ring.removeAttribute('filter');
+    face.setAttribute('fill', '#111');
+    label.setAttribute('fill', '#444');
+  }
+}
+
+function updateHandbrakeLight(active) {
+  const light = document.getElementById('handbrakLight');
+  const arcL  = document.getElementById('handbrakArcL');
+  const arcR  = document.getElementById('handbrakArcR');
+  const excl  = document.getElementById('handbrakExcl');
+  const lbl   = document.getElementById('handbrakLabel');
+  if (!light) return;
+  const dashOn = keyPos >= 1;
+  const lit = dashOn && active;
+  const col = lit ? '#cc0000' : '#300000';
+  light.setAttribute('stroke', col);
+  if (lit) light.setAttribute('filter', 'url(#glow)'); else light.removeAttribute('filter');
+  [arcL, arcR].forEach(a => a && a.setAttribute('stroke', col));
+  if (excl) excl.setAttribute('fill', col);
+  if (lbl)  lbl.setAttribute('fill', col);
 }
 
 function updateStallLight(stalled) {
@@ -707,8 +1184,9 @@ function makeSoftClipCurve(amount) {
 }
 
 function initAudio() {
-  if (audioCtx) return;
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (engineOsc1) return; // osciladores ya creados
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  else if (audioCtx.state === 'suspended') audioCtx.resume();
   const f = AUDIO_FREQ_IDLE;
 
   engineOsc1 = audioCtx.createOscillator();
@@ -768,6 +1246,138 @@ function initAudio() {
   engineOsc2.start();
   engineOsc3.start();
   idleLfo.start();
+}
+
+function ensureAudioCtx() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  } else if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+}
+
+function playKeyInsertSound() {
+  ensureAudioCtx();
+  const t = audioCtx.currentTime;
+  const dur = 0.06;
+  const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * dur, audioCtx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++)
+    d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 4);
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  const filt = audioCtx.createBiquadFilter();
+  filt.type = 'bandpass'; filt.frequency.value = 4000; filt.Q.value = 2;
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(3, t);
+  g.gain.exponentialRampToValueAtTime(0.01, t + dur);
+  src.connect(filt); filt.connect(g); g.connect(audioCtx.destination);
+  src.start(t);
+}
+
+function playKeyTurnSound() {
+  ensureAudioCtx();
+  const t = audioCtx.currentTime;
+  const dur = 0.09;
+  const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * dur, audioCtx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++)
+    d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2);
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  const filt = audioCtx.createBiquadFilter();
+  filt.type = 'bandpass'; filt.frequency.value = 1800; filt.Q.value = 3;
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(2, t);
+  g.gain.exponentialRampToValueAtTime(0.01, t + dur);
+  src.connect(filt); filt.connect(g); g.connect(audioCtx.destination);
+  src.start(t);
+}
+
+function playElectricChime(on) {
+  ensureAudioCtx();
+  const t = audioCtx.currentTime;
+  // Bing de dos tonos: subiendo al encender, bajando al apagar
+  const notes = on ? [{f: 660, at: 0}, {f: 880, at: 0.18}]
+                   : [{f: 880, at: 0}, {f: 660, at: 0.18}];
+
+  for (const n of notes) {
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = n.f;
+
+    // Segundo armónico para riqueza
+    const osc2 = audioCtx.createOscillator();
+    osc2.type = 'sine';
+    osc2.frequency.value = n.f * 2;
+    const g2 = audioCtx.createGain(); g2.gain.value = 0.15;
+
+    const g = audioCtx.createGain();
+    const start = t + n.at;
+    g.gain.setValueAtTime(0, start);
+    g.gain.linearRampToValueAtTime(0.25, start + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.001, start + 0.4);
+
+    osc.connect(g);
+    osc2.connect(g2); g2.connect(g);
+    g.connect(audioCtx.destination);
+
+    osc.start(start);  osc.stop(start + 0.45);
+    osc2.start(start); osc2.stop(start + 0.45);
+  }
+}
+
+function playStarterSound(durationMs) {
+  ensureAudioCtx();
+  const t   = audioCtx.currentTime;
+  const dur = durationMs / 1000;
+
+  // Motor eléctrico de arranque: zumbido grave con ritmo de engranaje
+  const osc = audioCtx.createOscillator();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(110, t);
+  osc.frequency.linearRampToValueAtTime(130, t + dur); // sube un poco al girar
+
+  const osc2 = audioCtx.createOscillator();
+  osc2.type = 'square';
+  osc2.frequency.value = 55; // subarmónico
+
+  // LFO sinusoidal suave: ritmo "rr-rr-rr" del engranaje
+  const lfo = audioCtx.createOscillator();
+  lfo.type = 'sine';
+  lfo.frequency.value = 11;
+  const lfoGain = audioCtx.createGain();
+  lfoGain.gain.value = 0.35;
+  const modNode = audioCtx.createGain();
+  modNode.gain.value = 0.65;
+  lfo.connect(lfoGain);
+  lfoGain.connect(modNode.gain);
+
+  // Mezcla de osciladores
+  const g1 = audioCtx.createGain(); g1.gain.value = 0.6;
+  const g2 = audioCtx.createGain(); g2.gain.value = 0.25;
+  osc.connect(g1);  g1.connect(modNode);
+  osc2.connect(g2); g2.connect(modNode);
+
+  // Filtro paso bajo: sonido amortiguado bajo el capó
+  const lpf = audioCtx.createBiquadFilter();
+  lpf.type = 'lowpass';
+  lpf.frequency.value = 900;
+  lpf.Q.value = 1;
+
+  // Ganancia maestra moderada
+  const master = audioCtx.createGain();
+  master.gain.setValueAtTime(0, t);
+  master.gain.linearRampToValueAtTime(0.35, t + 0.04);
+  master.gain.setValueAtTime(0.35, t + dur - 0.06);
+  master.gain.linearRampToValueAtTime(0, t + dur);
+
+  modNode.connect(lpf);
+  lpf.connect(master);
+  master.connect(audioCtx.destination);
+
+  osc.start(t); osc2.start(t); lfo.start(t);
+  osc.stop(t + dur); osc2.stop(t + dur); lfo.stop(t + dur);
 }
 
 function playStallSound() {
@@ -912,6 +1522,37 @@ function updateEngineSound(accelPct, running) {
   engineGain.gain.setTargetAtTime(vol, t, AUDIO_INERTIA);
 }
 
+let handbrakeMsgTimer   = null;
+let brakeAccelMsgTimer  = null;
+let clutchMsgTimer      = null;
+
+function showHandbrakeMessage() {
+  if (handbrakeMsgTimer) return;
+  const el = document.getElementById('handbrake-message');
+  el.classList.remove('show');
+  void el.offsetWidth;
+  el.classList.add('show');
+  handbrakeMsgTimer = setTimeout(() => { handbrakeMsgTimer = null; }, 2500);
+}
+
+function showBrakeAccelMessage() {
+  if (brakeAccelMsgTimer) return;
+  const el = document.getElementById('brakeaccel-message');
+  el.classList.remove('show');
+  void el.offsetWidth;
+  el.classList.add('show');
+  brakeAccelMsgTimer = setTimeout(() => { brakeAccelMsgTimer = null; }, 2500);
+}
+
+function showClutchMessage() {
+  if (clutchMsgTimer) return;
+  const el = document.getElementById('clutch-message');
+  el.classList.remove('show');
+  void el.offsetWidth;
+  el.classList.add('show');
+  clutchMsgTimer = setTimeout(() => { clutchMsgTimer = null; }, 2500);
+}
+
 function showStallMessage() {
   const stallMsg = document.getElementById('stall-message');
   stallMsg.classList.remove('show');
@@ -984,6 +1625,64 @@ arrancarEl.addEventListener('change', () => {
   }
 });
 
+// ── Llave de contacto ─────────────────────────────────────────────────────────
+const KEY_POSITIONS = [
+  { label: 'LOCK',  angle: 180 },
+  { label: 'ON',    angle: 240 },
+  { label: 'START', angle: 300 },
+];
+let keyPos = -1; // -1=sin llave, 0=LOCK, 1=ON, 2=START
+let keyFromStart = false; // indica que ON viene de haber pasado por START
+let startReturnTimer = null;
+
+function applyKeyPosition(pos) {
+  keyPos = pos;
+  const keyEl = document.getElementById('llave-key');
+
+  if (pos === -1) {
+    keyEl.setAttribute('display', 'none');
+    return;
+  }
+
+  // Sonidos según posición
+  if (pos === 0) playKeyInsertSound();           // insertar llave → LOCK
+  else if (pos === 1) playKeyTurnSound();         // girar a ON
+  else if (pos === 2) playStarterSound(600);      // arranque
+
+  // Mostrar y rotar la llave
+  keyEl.setAttribute('display', '');
+  keyEl.setAttribute('transform', `rotate(${KEY_POSITIONS[pos].angle}, 27, 27)`);
+
+  // Comportamiento del motor
+  if (pos === 2) {
+    // START: activar audio (requiere gesto) y programar retorno a ON
+    initAudio();
+    if (electricMode) initElectricAudio();
+    keyFromStart = true;
+    if (startReturnTimer) clearTimeout(startReturnTimer);
+    startReturnTimer = setTimeout(() => applyKeyPosition(1), 600);
+  } else if (pos === 1) {
+    // ON: si viene de START, arrancar el motor ahora
+    if (keyFromStart) {
+      keyFromStart   = false;
+      engineRunning  = true;
+      engineStalled  = false;
+      stallTimer     = 0;
+      arrancarEl.checked = true;
+    } else {
+      arrancarEl.checked = engineRunning;
+    }
+  } else {
+    // LOCK: apagar motor y volver a N
+    keyFromStart  = false;
+    engineRunning = false;
+    arrancarEl.checked = false;
+    gear = 'N';
+    updateGearHighlight();
+  }
+}
+
+
 document.getElementById('motorElectrico').addEventListener('change', function() {
   electricMode = this.checked;
 
@@ -991,14 +1690,25 @@ document.getElementById('motorElectrico').addEventListener('change', function() 
   const escapeRects = document.querySelectorAll('#caja rect[fill="#333"], #caja rect[fill="#222"]');
   escapeRects.forEach(r => r.style.display = electricMode ? 'none' : '');
 
-  // Mostrar/ocultar selector de marchas y barra de embrague
-  document.querySelector('.gear-selector').style.display = electricMode ? 'none' : '';
-  document.getElementById('clutch-bar').style.display = electricMode ? 'none' : '';
+  // Mostrar/ocultar selector de marchas SVG
+  const gearHG2 = document.getElementById('gear-h-group');
+  if (gearHG2) gearHG2.setAttribute('display', electricMode ? 'none' : '');
+
+  // Mostrar llave o botón START/STOP según modo
+  const swG2  = document.getElementById('llave-switch-g');
+  const btnG2 = document.getElementById('btn-start-stop');
+  if (swG2)  swG2.setAttribute('display',  electricMode ? 'none' : '');
+  if (btnG2) btnG2.setAttribute('display', electricMode ? '' : 'none');
+
+  // Apagar motor al cambiar de modo
+  engineRunning = false;
+  arrancarEl.checked = false;
+  updateStartStopButton();
 
   if (electricMode) {
     // Fijar marcha 1 automáticamente (ratio constante)
     gear = '1';
-    document.querySelector('input[name="marcha"][value="1"]').checked = true;
+    gear = '1'; updateGearHighlight();
     if (audioCtx) engineGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
     if (engineRunning) initElectricAudio();
     engineStalled = false;
@@ -1006,13 +1716,14 @@ document.getElementById('motorElectrico').addEventListener('change', function() 
   } else {
     // Volver a neutro
     gear = 'N';
-    document.querySelector('input[name="marcha"][value="N"]').checked = true;
+    gear = 'N'; updateGearHighlight();
     if (electricGain) electricGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
   }
 });
 
 frenoMano.addEventListener('change', async () => {
   handbrake = frenoMano.checked;
+  updateLeverAnim();
   if (!handbrake && !arduinoConnected) {
     await connectArduino();
   }

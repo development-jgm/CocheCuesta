@@ -12,35 +12,23 @@
     <label for="pendiente">Pendiente</label>
     <input type="range" id="pendiente" min="0" max="100" value="0">
     <span id="valor">0%</span>
-    <label class="arrancar">
-      <input type="checkbox" id="arrancar">
-      Arrancar
-    </label>
-    <label class="freno-mano">
-      <input type="checkbox" id="frenoMano" checked>
-      Freno de mano
-    </label>
+    <input type="checkbox" id="arrancar" style="display:none">
+    <input type="checkbox" id="frenoMano" checked style="display:none">
     <label class="motor-electrico">
       <input type="checkbox" id="motorElectrico">
       Motor eléctrico
     </label>
-    <div class="gear-selector">
-      <span class="gear-label">Marcha:</span>
-      <label class="gear-btn"><input type="radio" name="marcha" value="N" checked disabled><span>N</span></label>
-      <label class="gear-btn"><input type="radio" name="marcha" value="1" disabled><span>1</span></label>
-      <label class="gear-btn"><input type="radio" name="marcha" value="2" disabled><span>2</span></label>
-      <label class="gear-btn"><input type="radio" name="marcha" value="3" disabled><span>3</span></label>
-      <label class="gear-btn"><input type="radio" name="marcha" value="4" disabled><span>4</span></label>
-      <label class="gear-btn"><input type="radio" name="marcha" value="5" disabled><span>5</span></label>
-    </div>
   </div>
   <div class="cuadrado">
     <div id="stall-message">¡SE TE HA CALADO!</div>
+    <div id="handbrake-message">¡QUITA EL FRENO DE MANO!</div>
+    <div id="brakeaccel-message">¡NO PISES FRENO Y ACELERADOR A LA VEZ!</div>
+    <div id="clutch-message">PARA CAMBIAR DE MARCHA,<br>PISA EL EMBRAGUE</div>
     <div id="cockpit">
-      <svg id="gauge" viewBox="0 0 480 220" width="480" height="220"></svg>
+      <svg id="gauge" viewBox="0 0 480 435" width="480" height="435"></svg>
     </div>
     <div id="pedals-container" style="position: absolute; top: 15px; left: 495px; z-index: 10;">
-      <svg id="pedals-gauge" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 220" width="90" height="220">
+      <svg id="pedals-gauge" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 235" width="90" height="235">
         <defs>
           <pattern id="handbrake-pattern" x="0" y="0" width="6" height="6" patternUnits="userSpaceOnUse">
             <rect width="6" height="6" fill="#ccc"/>
@@ -52,6 +40,7 @@
           <rect x="5" y="10" width="24" height="200" fill="none" stroke="#666" stroke-width="1.5" rx="2"/>
           <rect id="clutch-fill" x="5" y="10" width="24" height="200" fill="#4a90e2" rx="2"/>
           <text x="17" y="110" text-anchor="middle" dominant-baseline="middle" transform="rotate(-90, 17, 110)" font-size="18" fill="#666" font-family="Arial" font-weight="bold" pointer-events="none">EMBRAGUE</text>
+          <text id="clutch-val" x="17" y="225" text-anchor="middle" font-size="10" fill="#666" font-family="Arial">0%</text>
         </g>
         <!-- Freno (centro) -->
         <rect x="33" y="10" width="24" height="200" fill="none" stroke="#666" stroke-width="1.5" rx="2"/>
@@ -59,19 +48,22 @@
         <rect id="handbrake-overlay" x="33" y="10" width="24" height="200" fill="url(#handbrake-pattern)" rx="2" display="none"/>
         <text x="45" y="110" text-anchor="middle" dominant-baseline="middle" transform="rotate(-90, 45, 110)" font-size="18" fill="#666" font-family="Arial" font-weight="bold" pointer-events="none">FRENO</text>
         <text id="handbrake-icon" x="45" y="60" text-anchor="middle" dominant-baseline="middle" font-size="22" fill="#c0392b" font-family="Arial" font-weight="bold" display="none">!</text>
+        <text id="brake-val" x="45" y="225" text-anchor="middle" font-size="10" fill="#666" font-family="Arial">0%</text>
         <!-- Acelerador (derecha) -->
         <rect x="61" y="10" width="24" height="200" fill="none" stroke="#666" stroke-width="1.5" rx="2"/>
         <rect id="accel-fill" x="61" y="10" width="24" height="200" fill="#2ecc71" rx="2"/>
         <text x="73" y="110" text-anchor="middle" dominant-baseline="middle" transform="rotate(-90, 73, 110)" font-size="18" fill="#666" font-family="Arial" font-weight="bold" pointer-events="none">ACELERADOR</text>
+        <text id="accel-val" x="73" y="225" text-anchor="middle" font-size="10" fill="#666" font-family="Arial">0%</text>
       </svg>
-      <div style="display: flex; width: 90px; font-size: 10px; text-align: center; color: #666; justify-content: space-around; margin-top: 2px;">
-        <span id="clutch-val">0</span>%
-        <span id="brake-val">0</span>%
-        <span id="accel-val">0</span>%
-      </div>
     </div>
     <div class="triangulo" id="triangulo"></div>
-    <svg id="caja" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 40" width="320" height="160">
+    <div id="calle" style="position:absolute;bottom:0;left:0;width:100%;height:18px;background:#555;z-index:0;display:none;">
+      <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+        <line x1="0" y1="9" x2="100%" y2="9" stroke="white" stroke-width="3" stroke-dasharray="30,20"/>
+      </svg>
+    </div>
+    <svg id="ciudad-svg" xmlns="http://www.w3.org/2000/svg" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:1;display:none;overflow:hidden;pointer-events:none;"></svg>
+    <svg id="caja" xmlns="http://www.w3.org/2000/svg" viewBox="-4 0 84 40" width="320" height="160">
       <!-- Tubo de escape (capa más inferior, se dibuja primero) -->
       <rect x="2" y="25" width="6" height="2.5" rx="1" fill="#333"/>
       <rect x="2" y="25.5" width="2" height="1.5" rx="0.5" fill="#222"/>
@@ -113,6 +105,7 @@
       </g>
     </svg>
   </div>
+  <div id="fondo-inferior"></div>
   <script src="script.js"></script>
 </body>
 </html>
